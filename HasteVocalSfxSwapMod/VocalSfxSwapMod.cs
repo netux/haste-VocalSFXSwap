@@ -17,6 +17,7 @@ public class VocalSfxSwapMod
 
     protected static Dictionary<int, Dictionary<string, SfxInstanceSwapConfig>> vocalBanksReplacements = [];
     protected static Dictionary<int, VocalBank> skinVocalBankCache = [];
+    protected static Dictionary<string, AudioClip> pathToAudioClipCache = [];
 
     private static VocalBank? baseZoeVocalBank;
     public static VocalBank? BaseZoeVocalBank {
@@ -204,6 +205,7 @@ public class VocalSfxSwapMod
                 }
 
                 config.Clips = foundSoundFilesPerSkinPerSfx[skinIndex][sfxName].ToArray();
+
                 Debug.Log($"[{nameof(VocalSfxSwapMod)}] Adding individual vocal sfx sound files for sfx {sfxName}, skin {skinIndex}:\n{
                     string.Join("\n",
                         foundSoundFilesPerSkinPerSfx[skinIndex][sfxName]
@@ -305,17 +307,38 @@ public class VocalSfxSwapMod
                 List<AudioClip> clips = [];
                 foreach (var path in sfxInstanceConfig.Clips ?? [])
                 {
-                    Debug.Log($"[{nameof(VocalSfxSwapMod)}] Loading AudioClip {path}");
+                    var fullPath = Path.GetFullPath(path);
 
-                    var audioClip = await LoadAudioClipFromPath(path);
-                    if (audioClip == null)
+                    AudioClip? clip;
+                    if (pathToAudioClipCache.ContainsKey(fullPath))
+                    {
+                        clip = pathToAudioClipCache[fullPath];
+                    }
+                    else
+                    {
+                        Debug.Log($"[{nameof(VocalSfxSwapMod)}] Loading new AudioClip {path}");
+
+                        var loadedClip = await LoadAudioClipFromPath(path);
+                        if (loadedClip == null)
+                        {
+                            continue;
+                        }
+
+                        clip = loadedClip;
+                        clip.name = $"VocalSfx {Path.GetFileNameWithoutExtension(fullPath)}";
+
+                        pathToAudioClipCache.Add(fullPath, clip);
+                    
+                        Debug.Log($"[{nameof(VocalSfxSwapMod)}] Successfully loaded AudioClip {path}");
+
+                    }
+
+                    if (clip == null)
                     {
                         continue;
                     }
 
-                    clips.Add(audioClip);
-
-                    Debug.Log($"[{nameof(VocalSfxSwapMod)}] Successfully loaded AudioClip {path}");
+                    clips.Add(clip);
                 }
                 newSfxInstance.clips = clips.ToArray();
             }
