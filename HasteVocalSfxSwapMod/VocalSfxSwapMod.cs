@@ -24,11 +24,13 @@ public class VocalSfxSwapMod
         get { return baseZoeVocalBank; }
     }
 
+    private static readonly SemaphoreSlim replaceVocalsSemaphore = new(1, 1);
+
     static VocalSfxSwapMod()
     {
         FactSystem.SubscribeToFact(
             SkinManager.EquippedSkinBodyFact,
-            async (skinIndex) => await ReplaceVocals((int) skinIndex)
+            async (skinIndex) => await ReplaceVocalsMaybe((int) skinIndex)
         );
 
         SceneManager.sceneLoaded += async (newScene, mode) =>
@@ -38,8 +40,11 @@ public class VocalSfxSwapMod
                 return;
             }
 
-            Debug.Log($"[{nameof(VocalSfxSwapMod)}] Scene change: {newScene.name}");
-            await ReplaceVocals((int) FactSystem.GetFact(SkinManager.EquippedSkinBodyFact));
+            if (BaseZoeVocalBank == null)
+            {
+                var skinIndex = (int)FactSystem.GetFact(SkinManager.EquippedSkinBodyFact);
+                await ReplaceVocalsMaybe(skinIndex);
+            }
         };
 
         foreach (var item in Modloader.LoadedItemDirectories)
@@ -230,7 +235,25 @@ public class VocalSfxSwapMod
         return DownloadHandlerAudioClip.GetContent(uwr);
     }
 
-    public static async Task ReplaceVocals(int skinIndex)
+    public static async Task ReplaceVocalsMaybe(int skinIndex)
+    {
+        await replaceVocalsSemaphore.WaitAsync();
+
+        try
+        {
+            await ReplaceVocals(skinIndex);
+        }
+        catch (Exception error)
+        {
+            Debug.LogError($"[{nameof(VocalSfxSwapMod)}] Could not replace vocals: {error}");
+        }
+        finally
+        {
+            replaceVocalsSemaphore.Release();
+        }
+    }
+
+    private static async Task ReplaceVocals(int skinIndex)
     {
         if (PlayerVocalSFX.Instance == null)
         {
