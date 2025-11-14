@@ -70,7 +70,7 @@ public class VocalSfxSwapMod
     {
         Dictionary<int, Dictionary<string, List<string>>> foundSoundFilesPerSkinPerSfx = [];
 
-        void TryLoadWavFile(string wavFilePath)
+        void TryStoreWavFile(string wavFilePath)
         {
             // (name).(skin index).(sfx name).wav
             // (name).(skin index).(sfx name).(number).wav
@@ -179,7 +179,7 @@ public class VocalSfxSwapMod
         {
             if (filePath.EndsWith(".wav"))
             {
-                TryLoadWavFile(filePath);
+                TryStoreWavFile(filePath);
             }
             else if (filePath.EndsWith(".hastevocalssfx.json"))
             {
