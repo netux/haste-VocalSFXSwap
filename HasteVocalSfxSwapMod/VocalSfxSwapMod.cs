@@ -14,24 +14,37 @@ public class VocalSfxSwapMod
     private static readonly FieldInfo[] vocalBankSfxInstanceFields = typeof(VocalBank).GetFields()
         .Where((field) => field.FieldType == typeof(SFX_Instance))
         .ToArray();
+    private static readonly FieldInfo[] interactionVocalBankSfxInstanceFields = typeof(InteractionVocalBank).GetFields()
+        .Where((field) => field.FieldType == typeof(SFX_Instance))
+        .ToArray();
 
-    public static Dictionary<int, VocalSfxSwapSkinConfig> skinConfigs = [];
-    public static Dictionary<int, VocalBank> skinVocalBankCache = [];
+    public static readonly Dictionary<int, VocalSfxSwapSkinConfig> skinConfigs = [];
 
-    private static Dictionary<string, AudioClip> pathToAudioClipCache = [];
+    public static readonly Dictionary<int, VocalBank> skinVocalBankCache = [];
+    public static readonly Dictionary<int, InteractionVocalBank> skinInteractionVocalBankCache = [];
+
+    private static readonly Dictionary<string, AudioClip> pathToAudioClipCache = [];
 
     private static VocalBank? baseZoeVocalBank;
-    public static VocalBank? BaseZoeVocalBank {
+    public static VocalBank? BaseZoeVocalBank
+    {
         get { return baseZoeVocalBank; }
     }
 
+    private static InteractionVocalBank? baseZoeInteractionVocalBank;
+    public static InteractionVocalBank? BaseZoeInteractionVocalBank
+    {
+        get { return baseZoeInteractionVocalBank; }
+    }
+
     private static readonly SemaphoreSlim replaceVocalsSemaphore = new(1, 1);
+    private static readonly SemaphoreSlim replaceInteractionVocalsSemaphore = new(1, 1);
 
     static VocalSfxSwapMod()
     {
         FactSystem.SubscribeToFact(
             SkinManager.EquippedSkinBodyFact,
-            async (skinIndex) => await ReplaceVocalsMaybe((int) skinIndex)
+            async (skinIndex) => await ReplaceAllVocals((int) skinIndex)
         );
 
         SceneManager.sceneLoaded += async (newScene, mode) =>
@@ -44,7 +57,7 @@ public class VocalSfxSwapMod
             if (BaseZoeVocalBank == null)
             {
                 var skinIndex = (int)FactSystem.GetFact(SkinManager.EquippedSkinBodyFact);
-                await ReplaceVocalsMaybe(skinIndex);
+                await ReplaceAllVocals(skinIndex);
             }
         };
 
@@ -65,6 +78,11 @@ public class VocalSfxSwapMod
     private static string VocalBankFieldToSfxName(FieldInfo field)
     {
         return field.Name.Remove(field.Name.IndexOf("Vocals"), "Vocals".Length);
+    }
+
+    private static string InteractionVocalBankFieldToSfxName(FieldInfo field)
+    {
+        return $"interaction{field.Name.Substring(0, 1).ToUpper()}{field.Name.Substring(1)}";
     }
 
     private static void LoadVocalSfxs(string directory)
@@ -272,13 +290,13 @@ public class VocalSfxSwapMod
         return DownloadHandlerAudioClip.GetContent(uwr);
     }
 
-    public static async Task ReplaceVocalsMaybe(int skinIndex)
+    public static async Task ReplaceVocals(int skinIndex)
     {
         await replaceVocalsSemaphore.WaitAsync();
 
         try
         {
-            await ReplaceVocals(skinIndex);
+            await ForceReplaceVocals(skinIndex);
         }
         catch (Exception error)
         {
@@ -290,7 +308,7 @@ public class VocalSfxSwapMod
         }
     }
 
-    private static async Task ReplaceVocals(int skinIndex)
+    private static async Task ForceReplaceVocals(int skinIndex)
     {
         if (PlayerVocalSFX.Instance == null)
         {
@@ -305,7 +323,7 @@ public class VocalSfxSwapMod
 
         if (!skinConfigs.ContainsKey(skinIndex))
         {
-            Debug.Log($"[{nameof(VocalSfxSwapMod)}] Reset vocal bank to Zoe's default VocalBank");
+            Debug.Log($"[{nameof(VocalSfxSwapMod)}] Reset vocal bank to Zoe's default vocal bank");
             PlayerVocalSFX.Instance.vocalBank = baseZoeVocalBank;
             return;
         }
@@ -367,85 +385,207 @@ public class VocalSfxSwapMod
             var sfxName = VocalBankFieldToSfxName(field);
             if (!config.Swaps.ContainsKey(sfxName))
             {
-                //Debug.Log($"[{nameof(VocalSfxSwapMod)}] Skin {skinIndex} has no {sfxName} replacements");
                 continue;
             }
 
+            var swapConfig = config.Swaps[sfxName];
+
             var oldSfxInstance = (SFX_Instance)field.GetValue(vocalBank);
 
-            var newSfxInstance = ScriptableObject.CreateInstance<SFX_Instance>();
-            field.SetValue(vocalBank, newSfxInstance);
-
-            newSfxInstance.name = $"{oldSfxInstance.name} Skin {skinIndex}";
-            newSfxInstance.settings = oldSfxInstance.settings;
-            newSfxInstance.lastTimePlayed = oldSfxInstance.lastTimePlayed;
-
-            var sfxInstanceConfig = config.Swaps[sfxName];
-
-            if (sfxInstanceConfig.Settings != null)
-            {
-                newSfxInstance.settings = new SFX_Settings();
-
-                foreach (var settingField in typeof(SFX_Settings).GetFields())
-                {
-                    settingField.SetValue(newSfxInstance.settings, settingField.GetValue(oldSfxInstance.settings));
-                }
-
-                newSfxInstance.settings.volume *= sfxInstanceConfig.Settings.VolumeMultiplier;
-            }
-
-            List<AudioClip> clips = [];
-            foreach (var path in sfxInstanceConfig.Clips ?? [])
-            {
-                var fullPath = Path.GetFullPath(path);
-
-                AudioClip? clip;
-                if (pathToAudioClipCache.ContainsKey(fullPath))
-                {
-                    clip = pathToAudioClipCache[fullPath];
-                }
-                else
-                {
-                    Debug.Log($"[{nameof(VocalSfxSwapMod)}] Loading new AudioClip {path}");
-
-                    var loadedClip = await LoadAudioClipFromPath(path);
-                    if (loadedClip == null)
-                    {
-                        continue;
-                    }
-
-                    clip = loadedClip;
-                    clip.name = $"VocalSfx {Path.GetFileNameWithoutExtension(fullPath)}";
-
-                    pathToAudioClipCache.Add(fullPath, clip);
-
-                    Debug.Log($"[{nameof(VocalSfxSwapMod)}] Successfully loaded AudioClip {path}");
-
-                }
-
-                if (clip == null)
-                {
-                    continue;
-                }
-
-                clips.Add(clip);
-            }
-            newSfxInstance.clips = clips.ToArray();
+            SFX_Instance sfxInstance = await GenerateSfxInstance(oldSfxInstance, skinIndex, swapConfig);
+            field.SetValue(vocalBank, sfxInstance);
         }
 
         return vocalBank;
     }
 
+
+    public static async Task ReplaceInteractionVocals(int skinIndex)
+    {
+        await replaceInteractionVocalsSemaphore.WaitAsync();
+
+        try
+        {
+            await ForceReplaceInteractionVocals(skinIndex);
+        }
+        catch (Exception error)
+        {
+            Debug.LogError($"[{nameof(VocalSfxSwapMod)}] Could not replace vocals: {error}");
+        }
+        finally
+        {
+            replaceInteractionVocalsSemaphore.Release();
+        }
+    }
+
+    private static async Task ForceReplaceInteractionVocals(int skinIndex)
+    {
+        if (baseZoeInteractionVocalBank == null)
+        {
+            baseZoeInteractionVocalBank = InteractionCharacterDatabase.Instance.courier.VocalBank;
+        }
+
+        if (!skinConfigs.ContainsKey(skinIndex))
+        {
+            Debug.Log($"[{nameof(VocalSfxSwapMod)}] Reset vocal bank to Zoe's default interaction vocal bank");
+            InteractionCharacterDatabase.Instance.courier.VocalBank = baseZoeInteractionVocalBank;
+            return;
+        }
+
+        var skinConfig = skinConfigs[skinIndex];
+
+        InteractionVocalBank skinInteractionVocalBank;
+        if (!skinInteractionVocalBankCache.ContainsKey(skinIndex))
+        {
+            Debug.Log($"[{nameof(VocalSfxSwapMod)}] Skin interaction vocal bank not found in cache. Creating a new one...");
+
+            skinInteractionVocalBank = await GenerateSkinInteractionVocalBank(baseZoeInteractionVocalBank, skinIndex, skinConfig);
+            skinInteractionVocalBankCache[skinIndex] = skinInteractionVocalBank;
+        }
+        else
+        {
+            skinInteractionVocalBank = skinInteractionVocalBankCache[skinIndex];
+        }
+
+        InteractionCharacterDatabase.Instance.courier.VocalBank = skinInteractionVocalBank;
+    }
+
+    public static async Task<InteractionVocalBank> GenerateSkinInteractionVocalBank(int skinIndex, VocalSfxSwapSkinConfig config)
+    {
+        if (BaseZoeInteractionVocalBank == null)
+        {
+            throw new Exception("Missing Zoe's base interaction vocal bank");
+        }
+
+        return await GenerateSkinInteractionVocalBank(BaseZoeInteractionVocalBank, skinIndex, config);
+    }
+
+    public static async Task<InteractionVocalBank> GenerateSkinInteractionVocalBank(InteractionVocalBank baseInteractionVocalBank, int skinIndex, VocalSfxSwapSkinConfig config)
+    {
+        var interactionVocalBank = ScriptableObject.CreateInstance<InteractionVocalBank>();
+        interactionVocalBank.name = $"{baseInteractionVocalBank.name} Skin {skinIndex}";
+
+        // Copy all SFX_Instances from Zoe's base interaction vocal bank to the new interaction voice bank
+        foreach (var fieldInfo in interactionVocalBankSfxInstanceFields)
+        {
+            fieldInfo.SetValue(interactionVocalBank, fieldInfo.GetValue(baseInteractionVocalBank));
+        }
+
+        if (config.Swaps == null)
+        {
+            // What's the point? lol
+            return interactionVocalBank;
+        }
+
+        // Create new SFX_Instances for replacement SFX clips
+        foreach (var field in interactionVocalBankSfxInstanceFields)
+        {
+            var sfxName = InteractionVocalBankFieldToSfxName(field);
+            if (!config.Swaps.ContainsKey(sfxName))
+            {
+                continue;
+            }
+
+            var swapConfig = config.Swaps[sfxName];
+
+            var oldSfxInstance = (SFX_Instance)field.GetValue(interactionVocalBank);
+
+            SFX_Instance sfxInstance = await GenerateSfxInstance(oldSfxInstance, skinIndex, swapConfig);
+            field.SetValue(interactionVocalBank, sfxInstance);
+        }
+
+        return interactionVocalBank;
+    }
+
+    private static async Task<SFX_Instance> GenerateSfxInstance(SFX_Instance baseSfxInstance, int skinIndex, SfxInstanceSwapConfig config)
+    {
+        var sfxInstance = ScriptableObject.CreateInstance<SFX_Instance>();
+
+        sfxInstance.name = $"{baseSfxInstance.name} Skin {skinIndex}";
+        sfxInstance.settings = baseSfxInstance.settings;
+        sfxInstance.lastTimePlayed = baseSfxInstance.lastTimePlayed;
+
+        if (config.Settings != null)
+        {
+            sfxInstance.settings = new SFX_Settings();
+
+            foreach (var settingField in typeof(SFX_Settings).GetFields())
+            {
+                settingField.SetValue(sfxInstance.settings, settingField.GetValue(baseSfxInstance.settings));
+            }
+
+            sfxInstance.settings.volume *= config.Settings.VolumeMultiplier;
+        }
+
+        List<AudioClip> clips = [];
+        foreach (var path in config.Clips ?? [])
+        {
+            var fullPath = Path.GetFullPath(path);
+
+            AudioClip? clip;
+            if (pathToAudioClipCache.ContainsKey(fullPath))
+            {
+                clip = pathToAudioClipCache[fullPath];
+            }
+            else
+            {
+                Debug.Log($"[{nameof(VocalSfxSwapMod)}] Loading new AudioClip {path}");
+
+                var loadedClip = await LoadAudioClipFromPath(path);
+                if (loadedClip == null)
+                {
+                    continue;
+                }
+
+                clip = loadedClip;
+                clip.name = $"VocalSfx {Path.GetFileNameWithoutExtension(fullPath)}";
+
+                pathToAudioClipCache.Add(fullPath, clip);
+
+                Debug.Log($"[{nameof(VocalSfxSwapMod)}] Successfully loaded AudioClip {path}");
+
+            }
+
+            if (clip == null)
+            {
+                continue;
+            }
+
+            clips.Add(clip);
+        }
+        sfxInstance.clips = clips.ToArray();
+
+        return sfxInstance;
+    }
+
+    public static async Task ReplaceAllVocals(int skinIndex)
+    {
+        await Task.WhenAll([
+            ReplaceVocals(skinIndex),
+            ReplaceInteractionVocals(skinIndex)
+        ]);
+    }
+
     [Zorro.Core.CLI.ConsoleCommand]
     public static void ListVocalSfxNames()
     {
-        Debug.Log(string.Join("\n", vocalBankSfxInstanceFields.Select((field) => $"- {VocalBankFieldToSfxName(field)}")));
+        Debug.Log(
+            string.Join("\n", vocalBankSfxInstanceFields
+                .Select(VocalBankFieldToSfxName)
+                .Concat(
+                    interactionVocalBankSfxInstanceFields.Select(InteractionVocalBankFieldToSfxName)
+                )
+                .OrderBy((name) => name) // alphabetical
+                .Select((name) => $"- {name}")
+            )
+        );
     }
 
     [Zorro.Core.CLI.ConsoleCommand]
     public static void StartLoggingVocalSfxPlayed()
     {
         On.PlayerVocalSFX.Play += hook_PlayerVocalsSFXPlayLog;
+        On.InteractionVocalPlayer.PlaySFX += hook_InteractionVocalPlayerPlaySFXLog;
         Debug.Log($"[{nameof(VocalSfxSwapMod)}] Will start logging played vocal SFX");
     }
 
@@ -464,8 +604,18 @@ public class VocalSfxSwapMod
         float fadeTime
     )
     {
-        Debug.Log($"[{nameof(VocalSfxSwapMod)}] [DEBUG] Playing {sfx.name}");
+        Debug.Log($"[{nameof(VocalSfxSwapMod)}] [DEBUG] Playing vocal SFX \"{sfx.name}\"");
         original(playerVocalSfx, sfx, priority, fadeTime);
+    }
+
+    private static void hook_InteractionVocalPlayerPlaySFXLog(
+        On.InteractionVocalPlayer.orig_PlaySFX original,
+        InteractionVocalPlayer interactionVocalPlayer,
+        SFX_Instance sfx
+    )
+    {
+        Debug.Log($"[{nameof(VocalSfxSwapMod)}] [DEBUG] Playing interaction vocal SFX \"{sfx.name}\"");
+        original(interactionVocalPlayer, sfx);
     }
 }
 
