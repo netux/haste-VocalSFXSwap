@@ -169,7 +169,19 @@ public class VocalSfxSwapMod
                                     return soundFilePath;
                                 }
 
-                                return Path.Combine(configDirectoryBasePath, soundFilePath);
+                                string[] paths = [];
+                                if (skinConfig.BasePath != null)
+                                {
+                                    paths = [..paths,  skinConfig.BasePath];
+                                }
+                                if (swapConfig.BasePath != null)
+                                {
+                                    paths = [.. paths, swapConfig.BasePath];
+                                }
+
+                                paths = [configDirectoryBasePath, ..paths, soundFilePath];
+
+                                return Path.Combine(paths);
                             })
                         .ToArray();
                 }
@@ -433,6 +445,8 @@ public class VocalSfxSwapMod
 
 public record SfxInstanceSwapConfig
 {
+    [JsonProperty("basePath")]
+    public string? BasePath;
     [JsonProperty("clips")]
     public string[]? Clips;
     [JsonProperty("settings")]
@@ -447,6 +461,8 @@ public record SfxSettingsSwap
 
 public record VocalSfxSwapSkinConfig
 {
+    [JsonProperty("basePath")]
+    public string? BasePath;
     [JsonProperty("swaps")]
     public Dictionary<string, SfxInstanceSwapConfig>? Swaps;
 }
