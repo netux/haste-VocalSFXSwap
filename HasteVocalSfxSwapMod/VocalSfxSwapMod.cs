@@ -58,7 +58,7 @@ public class VocalSfxSwapMod
             if (Modloader.GetDirectoryFromFileId(item, out var directory, out var _isOverride))
             {
                 LoadVocalSfxs(directory);
-    }
+            }
         };
     }
 
@@ -157,8 +157,8 @@ public class VocalSfxSwapMod
                     {
                         if (swapConfig.Clips == null)
                         {
-                        continue;
-                    }
+                            continue;
+                        }
 
                         // Post-process: Resolve all paths
                         swapConfig.Clips = swapConfig.Clips
@@ -183,8 +183,8 @@ public class VocalSfxSwapMod
 
                                 return Path.Combine(paths);
                             })
-                        .ToArray();
-                }
+                            .ToArray();
+                    }
                 }
 
                 skinConfigs.Add(skinIndex, skinConfig);
@@ -218,7 +218,7 @@ public class VocalSfxSwapMod
             else if (!skinConfigs.ContainsKey(skinIndex))
             {
                 var skinConfig = new VocalSfxSwapSkinConfig()
-            {
+                {
                     Swaps = swaps
                 };
                 skinConfigs.Add(skinIndex, skinConfig);
@@ -344,13 +344,13 @@ public class VocalSfxSwapMod
         var vocalBank = ScriptableObject.CreateInstance<VocalBank>();
         vocalBank.name = $"{baseVocalBank.name} Skin {skinIndex}";
 
-            // Copy all SFX_Instances from Zoe's base vocal bank to the new voice bank
-            foreach (var fieldInfo in typeof(VocalBank).GetFields())
+        // Copy all SFX_Instances from Zoe's base vocal bank to the new voice bank
+        foreach (var fieldInfo in typeof(VocalBank).GetFields())
+        {
+            if (fieldInfo.FieldType != typeof(SFX_Instance))
             {
-                if (fieldInfo.FieldType != typeof(SFX_Instance))
-                {
-                    continue;
-                }
+                continue;
+            }
 
             fieldInfo.SetValue(vocalBank, fieldInfo.GetValue(baseVocalBank));
         }
@@ -359,87 +359,113 @@ public class VocalSfxSwapMod
         {
             // What's the point? lol
             return vocalBank;
-            }
+        }
 
-            // Create new SFX_Instances for replacement SFX clips
-            foreach (var field in vocalBankSfxInstanceFields)
-            {
-                var sfxName = VocalBankFieldToSfxName(field);
+        // Create new SFX_Instances for replacement SFX clips
+        foreach (var field in vocalBankSfxInstanceFields)
+        {
+            var sfxName = VocalBankFieldToSfxName(field);
             if (!config.Swaps.ContainsKey(sfxName))
-                {
-                    //Debug.Log($"[{nameof(VocalSfxSwapMod)}] Skin {skinIndex} has no {sfxName} replacements");
-                    continue;
-                }
+            {
+                //Debug.Log($"[{nameof(VocalSfxSwapMod)}] Skin {skinIndex} has no {sfxName} replacements");
+                continue;
+            }
 
             var oldSfxInstance = (SFX_Instance)field.GetValue(vocalBank);
 
-                var newSfxInstance = ScriptableObject.CreateInstance<SFX_Instance>();
+            var newSfxInstance = ScriptableObject.CreateInstance<SFX_Instance>();
             field.SetValue(vocalBank, newSfxInstance);
 
-                newSfxInstance.name = $"{oldSfxInstance.name} Skin {skinIndex}";
-                newSfxInstance.settings = oldSfxInstance.settings;
-                newSfxInstance.lastTimePlayed = oldSfxInstance.lastTimePlayed;
+            newSfxInstance.name = $"{oldSfxInstance.name} Skin {skinIndex}";
+            newSfxInstance.settings = oldSfxInstance.settings;
+            newSfxInstance.lastTimePlayed = oldSfxInstance.lastTimePlayed;
 
             var sfxInstanceConfig = config.Swaps[sfxName];
 
-                if (sfxInstanceConfig.Settings != null)
+            if (sfxInstanceConfig.Settings != null)
+            {
+                newSfxInstance.settings = new SFX_Settings();
+
+                foreach (var settingField in typeof(SFX_Settings).GetFields())
                 {
-                    newSfxInstance.settings = new SFX_Settings();
-
-                    foreach (var settingField in typeof(SFX_Settings).GetFields())
-                    {
-                        settingField.SetValue(newSfxInstance.settings, settingField.GetValue(oldSfxInstance.settings));
-                    }
-
-                    newSfxInstance.settings.volume *= sfxInstanceConfig.Settings.VolumeMultiplier;
+                    settingField.SetValue(newSfxInstance.settings, settingField.GetValue(oldSfxInstance.settings));
                 }
 
-                List<AudioClip> clips = [];
-                foreach (var path in sfxInstanceConfig.Clips ?? [])
+                newSfxInstance.settings.volume *= sfxInstanceConfig.Settings.VolumeMultiplier;
+            }
+
+            List<AudioClip> clips = [];
+            foreach (var path in sfxInstanceConfig.Clips ?? [])
+            {
+                var fullPath = Path.GetFullPath(path);
+
+                AudioClip? clip;
+                if (pathToAudioClipCache.ContainsKey(fullPath))
                 {
-                    var fullPath = Path.GetFullPath(path);
+                    clip = pathToAudioClipCache[fullPath];
+                }
+                else
+                {
+                    Debug.Log($"[{nameof(VocalSfxSwapMod)}] Loading new AudioClip {path}");
 
-                    AudioClip? clip;
-                    if (pathToAudioClipCache.ContainsKey(fullPath))
-                    {
-                        clip = pathToAudioClipCache[fullPath];
-                    }
-                    else
-                    {
-                        Debug.Log($"[{nameof(VocalSfxSwapMod)}] Loading new AudioClip {path}");
-
-                        var loadedClip = await LoadAudioClipFromPath(path);
-                        if (loadedClip == null)
-                        {
-                            continue;
-                        }
-
-                        clip = loadedClip;
-                        clip.name = $"VocalSfx {Path.GetFileNameWithoutExtension(fullPath)}";
-
-                        pathToAudioClipCache.Add(fullPath, clip);
-                    
-                        Debug.Log($"[{nameof(VocalSfxSwapMod)}] Successfully loaded AudioClip {path}");
-
-                    }
-
-                    if (clip == null)
+                    var loadedClip = await LoadAudioClipFromPath(path);
+                    if (loadedClip == null)
                     {
                         continue;
                     }
 
-                    clips.Add(clip);
+                    clip = loadedClip;
+                    clip.name = $"VocalSfx {Path.GetFileNameWithoutExtension(fullPath)}";
+
+                    pathToAudioClipCache.Add(fullPath, clip);
+
+                    Debug.Log($"[{nameof(VocalSfxSwapMod)}] Successfully loaded AudioClip {path}");
+
                 }
-                newSfxInstance.clips = clips.ToArray();
+
+                if (clip == null)
+                {
+                    continue;
+                }
+
+                clips.Add(clip);
             }
+            newSfxInstance.clips = clips.ToArray();
+        }
 
         return vocalBank;
-        }
+    }
 
     [Zorro.Core.CLI.ConsoleCommand]
     public static void ListVocalSfxNames()
     {
         Debug.Log(string.Join("\n", vocalBankSfxInstanceFields.Select((field) => $"- {VocalBankFieldToSfxName(field)}")));
+    }
+
+    [Zorro.Core.CLI.ConsoleCommand]
+    public static void StartLoggingVocalSfxPlayed()
+    {
+        On.PlayerVocalSFX.Play += hook_PlayerVocalsSFXPlayLog;
+        Debug.Log($"[{nameof(VocalSfxSwapMod)}] Will start logging played vocal SFX");
+    }
+
+    [Zorro.Core.CLI.ConsoleCommand]
+    public static void StopLoggingVocalSfxPlayed()
+    {
+        Debug.Log($"[{nameof(VocalSfxSwapMod)}] Will stop logging played vocal SFX");
+        On.PlayerVocalSFX.Play -= hook_PlayerVocalsSFXPlayLog;
+    }
+
+    private static void hook_PlayerVocalsSFXPlayLog(
+        On.PlayerVocalSFX.orig_Play original,
+        PlayerVocalSFX playerVocalSfx,
+        SFX_Instance sfx,
+        PlayerVocalSFX.Priority priority,
+        float fadeTime
+    )
+    {
+        Debug.Log($"[{nameof(VocalSfxSwapMod)}] [DEBUG] Playing {sfx.name}");
+        original(playerVocalSfx, sfx, priority, fadeTime);
     }
 }
 
