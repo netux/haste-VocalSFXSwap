@@ -396,6 +396,8 @@ public class VocalSfxSwapMod
             field.SetValue(vocalBank, sfxInstance);
         }
 
+        UnityEngine.Object.DontDestroyOnLoad(vocalBank);
+
         return vocalBank;
     }
 
@@ -493,6 +495,8 @@ public class VocalSfxSwapMod
             SFX_Instance sfxInstance = await GenerateSfxInstance(oldSfxInstance, skinIndex, swapConfig);
             field.SetValue(interactionVocalBank, sfxInstance);
         }
+
+        UnityEngine.Object.DontDestroyOnLoad(interactionVocalBank);
 
         return interactionVocalBank;
     }
