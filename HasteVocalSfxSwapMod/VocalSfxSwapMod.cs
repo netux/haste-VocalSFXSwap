@@ -47,10 +47,18 @@ public class VocalSfxSwapMod
             }
         };
 
-        foreach (var item in Modloader.LoadedItemDirectories)
+        foreach (var item in Modloader.LoadedItemDirectories.Values)
         {
-            LoadVocalSfxs(item.Value.directory);
+            LoadVocalSfxs(item.directory);
         }
+
+        Modloader.OnItemLoaded += (item) =>
+        {
+            if (Modloader.GetDirectoryFromFileId(item, out var directory, out var _isOverride))
+            {
+                LoadVocalSfxs(directory);
+    }
+        };
     }
 
     private static string VocalBankFieldToSfxName(FieldInfo field)
