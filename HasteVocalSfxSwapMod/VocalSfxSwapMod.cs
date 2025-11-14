@@ -15,9 +15,10 @@ public class VocalSfxSwapMod
         .Where((field) => field.FieldType == typeof(SFX_Instance))
         .ToArray();
 
-    protected static Dictionary<int, Dictionary<string, SfxInstanceSwapConfig>> vocalBanksReplacements = [];
-    protected static Dictionary<int, VocalBank> skinVocalBankCache = [];
-    protected static Dictionary<string, AudioClip> pathToAudioClipCache = [];
+    public static Dictionary<int, VocalSfxSwapSkinConfig> skinConfigs = [];
+    public static Dictionary<int, VocalBank> skinVocalBankCache = [];
+
+    private static Dictionary<string, AudioClip> pathToAudioClipCache = [];
 
     private static VocalBank? baseZoeVocalBank;
     public static VocalBank? BaseZoeVocalBank {
@@ -140,9 +141,9 @@ public class VocalSfxSwapMod
 
             try
             {
-                Dictionary<string, SfxInstanceSwapConfig>? configs = new JsonSerializer()
-                    .Deserialize<Dictionary<string, SfxInstanceSwapConfig>>(new JsonTextReader(file));
-                if (configs == null)
+                VocalSfxSwapSkinConfig? skinConfig = new JsonSerializer()
+                    .Deserialize<VocalSfxSwapSkinConfig>(new JsonTextReader(file));
+                if (skinConfig == null)
                 {
                     // Not sure when this can happen...
                     return;
@@ -150,23 +151,31 @@ public class VocalSfxSwapMod
 
                 var configDirectoryBasePath = Path.GetDirectoryName(configFilePath);
 
-                foreach (var config in configs.Values)
+                if (skinConfig.Swaps != null)
                 {
-                    if (config.Clips == null)
+                    foreach (var swapConfig in skinConfig.Swaps.Values)
                     {
+                        if (swapConfig.Clips == null)
+                        {
                         continue;
                     }
 
-                    // Post-process: Make all paths absolute
-                    config.Clips = config.Clips
-                        .Select(soundFilePath => Path.IsPathFullyQualified(soundFilePath)
-                            ? soundFilePath
-                            : Path.Combine(configDirectoryBasePath, soundFilePath)
-                        )
+                        // Post-process: Resolve all paths
+                        swapConfig.Clips = swapConfig.Clips
+                            .Select(soundFilePath =>
+                            {
+                                if (Path.IsPathFullyQualified(soundFilePath))
+                                {
+                                    return soundFilePath;
+                                }
+
+                                return Path.Combine(configDirectoryBasePath, soundFilePath);
+                            })
                         .ToArray();
                 }
+                }
 
-                vocalBanksReplacements.Add(skinIndex, configs);
+                skinConfigs.Add(skinIndex, skinConfig);
                 Debug.Log($"[{nameof(VocalSfxSwapMod)}] Loaded vocal sfx config file for skin {skinIndex}: {configFilePath}");
             }
             catch (JsonException error)
@@ -189,23 +198,31 @@ public class VocalSfxSwapMod
 
         foreach (var skinIndex in foundSoundFilesPerSkinPerSfx.Keys)
         {
-            Dictionary<string, SfxInstanceSwapConfig> skinConfigs;
-            if (vocalBanksReplacements.ContainsKey(skinIndex))
+            Dictionary<string, SfxInstanceSwapConfig> swaps = [];
+            if (skinConfigs.ContainsKey(skinIndex) && skinConfigs[skinIndex].Swaps == null)
             {
-                skinConfigs = vocalBanksReplacements[skinIndex];
+                skinConfigs[skinIndex].Swaps = swaps;
+            }
+            else if (!skinConfigs.ContainsKey(skinIndex))
+            {
+                var skinConfig = new VocalSfxSwapSkinConfig()
+            {
+                    Swaps = swaps
+                };
+                skinConfigs.Add(skinIndex, skinConfig);
             }
             else
             {
-                skinConfigs = [];
-                vocalBanksReplacements.Add(skinIndex, skinConfigs);
+                // Skin config overwrites sound files found. Ignore the sound files.
+                continue;
             }
 
             foreach (var sfxName in foundSoundFilesPerSkinPerSfx[skinIndex].Keys)
             {
                 SfxInstanceSwapConfig config;
-                if (skinConfigs.ContainsKey(sfxName))
+                if (swaps.ContainsKey(sfxName))
                 {
-                    config = skinConfigs[sfxName];
+                    config = swaps[sfxName];
                     if (config.Clips != null)
                     {
                         continue;
@@ -214,7 +231,7 @@ public class VocalSfxSwapMod
                 else
                 {
                     config = new();
-                    skinConfigs[sfxName] = config;
+                    swaps[sfxName] = config;
                 }
 
                 config.Clips = foundSoundFilesPerSkinPerSfx[skinIndex][sfxName].ToArray();
@@ -274,22 +291,46 @@ public class VocalSfxSwapMod
             baseZoeVocalBank = PlayerVocalSFX.Instance.vocalBank;
         }
 
-        if (!vocalBanksReplacements.ContainsKey(skinIndex))
+        if (!skinConfigs.ContainsKey(skinIndex))
         {
             Debug.Log($"[{nameof(VocalSfxSwapMod)}] Reset vocal bank to Zoe's default VocalBank");
             PlayerVocalSFX.Instance.vocalBank = baseZoeVocalBank;
             return;
         }
 
-        var skinReplacements = vocalBanksReplacements[skinIndex];
+        var skinConfig = skinConfigs[skinIndex];
 
         VocalBank skinVocalBank;
         if (!skinVocalBankCache.ContainsKey(skinIndex))
         {
             Debug.Log($"[{nameof(VocalSfxSwapMod)}] Skin vocal bank not found in cache. Creating a new one...");
 
-            skinVocalBank = ScriptableObject.CreateInstance<VocalBank>();
-            skinVocalBank.name = $"{baseZoeVocalBank.name} Skin {skinIndex}";
+            skinVocalBank = await GenerateSkinVocalBank(baseZoeVocalBank, skinIndex, skinConfig);
+            skinVocalBankCache[skinIndex] = skinVocalBank;
+        }
+        else
+        {
+            skinVocalBank = skinVocalBankCache[skinIndex];
+        }
+
+        Debug.Log($"[{nameof(VocalSfxSwapMod)}] Set new skin vocal bank: {skinVocalBank}");
+        PlayerVocalSFX.Instance.vocalBank = skinVocalBank;
+    }
+
+    public static async Task<VocalBank> GenerateSkinVocalBank(int skinIndex, VocalSfxSwapSkinConfig config)
+    {
+        if (BaseZoeVocalBank == null)
+        {
+            throw new Exception("Missing Zoe's base vocal bank");
+        }
+
+        return await GenerateSkinVocalBank(BaseZoeVocalBank, skinIndex, config);
+    }
+
+    public static async Task<VocalBank> GenerateSkinVocalBank(VocalBank baseVocalBank, int skinIndex, VocalSfxSwapSkinConfig config)
+    {
+        var vocalBank = ScriptableObject.CreateInstance<VocalBank>();
+        vocalBank.name = $"{baseVocalBank.name} Skin {skinIndex}";
 
             // Copy all SFX_Instances from Zoe's base vocal bank to the new voice bank
             foreach (var fieldInfo in typeof(VocalBank).GetFields())
@@ -299,29 +340,35 @@ public class VocalSfxSwapMod
                     continue;
                 }
 
-                fieldInfo.SetValue(skinVocalBank, fieldInfo.GetValue(baseZoeVocalBank));
+            fieldInfo.SetValue(vocalBank, fieldInfo.GetValue(baseVocalBank));
+        }
+
+        if (config.Swaps == null)
+        {
+            // What's the point? lol
+            return vocalBank;
             }
 
             // Create new SFX_Instances for replacement SFX clips
             foreach (var field in vocalBankSfxInstanceFields)
             {
                 var sfxName = VocalBankFieldToSfxName(field);
-                if (!skinReplacements.ContainsKey(sfxName))
+            if (!config.Swaps.ContainsKey(sfxName))
                 {
                     //Debug.Log($"[{nameof(VocalSfxSwapMod)}] Skin {skinIndex} has no {sfxName} replacements");
                     continue;
                 }
 
-                var oldSfxInstance = (SFX_Instance)field.GetValue(skinVocalBank);
+            var oldSfxInstance = (SFX_Instance)field.GetValue(vocalBank);
 
                 var newSfxInstance = ScriptableObject.CreateInstance<SFX_Instance>();
-                field.SetValue(skinVocalBank, newSfxInstance);
+            field.SetValue(vocalBank, newSfxInstance);
 
                 newSfxInstance.name = $"{oldSfxInstance.name} Skin {skinIndex}";
                 newSfxInstance.settings = oldSfxInstance.settings;
                 newSfxInstance.lastTimePlayed = oldSfxInstance.lastTimePlayed;
 
-                var sfxInstanceConfig = skinReplacements[sfxName];
+            var sfxInstanceConfig = config.Swaps[sfxName];
 
                 if (sfxInstanceConfig.Settings != null)
                 {
@@ -374,15 +421,8 @@ public class VocalSfxSwapMod
                 newSfxInstance.clips = clips.ToArray();
             }
 
-            skinVocalBankCache[skinIndex] = skinVocalBank;
-        } else
-        {
-            skinVocalBank = skinVocalBankCache[skinIndex];
+        return vocalBank;
         }
-
-        Debug.Log($"[{nameof(VocalSfxSwapMod)}] Set new skin vocal bank: {skinVocalBank}");
-        PlayerVocalSFX.Instance.vocalBank = skinVocalBank;
-    }
 
     [Zorro.Core.CLI.ConsoleCommand]
     public static void ListVocalSfxNames()
@@ -403,4 +443,10 @@ public record SfxSettingsSwap
 {
     [JsonProperty("volumeMultiplier")]
     public float VolumeMultiplier = 1f;
+}
+
+public record VocalSfxSwapSkinConfig
+{
+    [JsonProperty("swaps")]
+    public Dictionary<string, SfxInstanceSwapConfig>? Swaps;
 }
