@@ -296,7 +296,7 @@ public class VocalSfxSwapMod
         {
             skinVocalBankCache.Remove(skinIndex);
             skinInteractionVocalBankCache.Remove(skinIndex);
-    }
+        }
     }
 
     public static void RegisterSkinConfig(VocalSfxSwapSkinConfig skinConfig)
@@ -630,6 +630,43 @@ public class VocalSfxSwapMod
                 .Select((name) => $"- {name}")
             )
         );
+    }
+
+    [Zorro.Core.CLI.ConsoleCommand]
+    public static void WriteExampleConfig()
+    {
+        var path = Path.Combine(Path.GetDirectoryName(Application.dataPath), "Example.0.hastevocalsfx.json");
+
+        var config = new VocalSfxSwapSkinConfig()
+        {
+            BasePath = "",
+            Swaps = new(
+                vocalBankSfxInstanceFields
+                    .Select(VocalBankFieldToSfxName)
+                    .Concat(
+                        interactionVocalBankSfxInstanceFields.Select(InteractionVocalBankFieldToSfxName)
+                    )
+                    .OrderBy((name) => name) // alphabetical
+                    .Select((name) => new KeyValuePair<string, SfxInstanceSwapConfig>(
+                        name,
+                        new()
+                        {
+                            Clips = [],
+                            Settings = new()
+                        }
+                    ))
+            )
+        };
+
+        var configJson = JsonConvert.SerializeObject(config, new JsonSerializerSettings()
+        {
+            Formatting = Formatting.Indented,
+            NullValueHandling = NullValueHandling.Ignore,
+        });
+
+        File.WriteAllText(path, configJson);
+
+        Debug.Log($"[{nameof(VocalSfxSwapMod)}] Written example config to {path}");
     }
 
     [Zorro.Core.CLI.ConsoleCommand]
