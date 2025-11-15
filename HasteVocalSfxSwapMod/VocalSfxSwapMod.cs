@@ -203,11 +203,11 @@ public class VocalSfxSwapMod
                                 }
 
                                 string[] paths = [];
-                                if (skinConfig.BasePath != null)
+                                if (skinConfig.BasePath != null && skinConfig.BasePath != "")
                                 {
                                     paths = [.. paths, skinConfig.BasePath];
                                 }
-                                if (swapConfig.BasePath != null)
+                                if (swapConfig.BasePath != null && swapConfig.BasePath != "")
                                 {
                                     paths = [.. paths, swapConfig.BasePath];
                                 }
