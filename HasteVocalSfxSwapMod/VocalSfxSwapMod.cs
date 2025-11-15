@@ -74,14 +74,14 @@ public class VocalSfxSwapMod
 
         foreach (var item in Modloader.LoadedItemDirectories.Values)
         {
-            LoadVocalSfxs(item.directory);
+            RegisterSkinConfigInDirectory(item.directory);
         }
 
         Modloader.OnItemLoaded += (item) =>
         {
             if (Modloader.GetDirectoryFromFileId(item, out var directory, out var _isOverride))
             {
-                LoadVocalSfxs(directory);
+                RegisterSkinConfigInDirectory(directory);
             }
         };
     }
@@ -96,7 +96,7 @@ public class VocalSfxSwapMod
         return $"interaction{field.Name.Substring(0, 1).ToUpper()}{field.Name.Substring(1)}";
     }
 
-    public static void LoadVocalSfxs(string modDirectory)
+    public static void RegisterSkinConfigInDirectory(string modDirectory)
     {
         HashSet<int> loadedSkinIndices = [];
         Dictionary<int, Dictionary<string, List<string>>> foundSoundFilesPerSkinPerSfx = [];
@@ -296,7 +296,7 @@ public class VocalSfxSwapMod
     }
     }
 
-    public static void LoadVocalSfxs(int skinIndex, VocalSfxSwapSkinConfig skinConfig)
+    public static void RegisterSkinConfig(int skinIndex, VocalSfxSwapSkinConfig skinConfig)
     {
         skinConfigs[skinIndex] = skinConfig;
 
