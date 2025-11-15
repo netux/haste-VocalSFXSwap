@@ -234,7 +234,7 @@ public class VocalSfxSwapMod
             {
                 TryStoreAudioFile(filePath);
             }
-            else if (filePath.EndsWith(".hastevocalssfx.json"))
+            else if (filePath.EndsWith(".hastevocalsfx.json"))
             {
                 TryLoadConfigFile(filePath);
             }
