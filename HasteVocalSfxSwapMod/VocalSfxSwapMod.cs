@@ -98,6 +98,7 @@ public class VocalSfxSwapMod
 
     public static void LoadVocalSfxs(string modDirectory)
     {
+        HashSet<int> loadedSkinIndices = [];
         Dictionary<int, Dictionary<string, List<string>>> foundSoundFilesPerSkinPerSfx = [];
 
         void TryStoreAudioFile(string audioFilePath)
@@ -216,6 +217,7 @@ public class VocalSfxSwapMod
                 }
 
                 skinConfigs.Add(skinIndex, skinConfig);
+                loadedSkinIndices.Add(skinIndex);
                 Debug.Log($"[{nameof(VocalSfxSwapMod)}] Loaded vocal sfx config file for skin {skinIndex}: {configFilePath}");
             }
             catch (JsonException error)
@@ -283,12 +285,23 @@ public class VocalSfxSwapMod
                     )
                 }");
             }
+
+            loadedSkinIndices.Add(skinIndex);
         }
+
+        foreach (var skinIndex in loadedSkinIndices)
+        {
+            skinVocalBankCache.Remove(skinIndex);
+            skinInteractionVocalBankCache.Remove(skinIndex);
+    }
     }
 
     public static void LoadVocalSfxs(int skinIndex, VocalSfxSwapSkinConfig skinConfig)
     {
         skinConfigs[skinIndex] = skinConfig;
+
+        skinVocalBankCache.Remove(skinIndex);
+        skinInteractionVocalBankCache.Remove(skinIndex);
     }
 
     public static async Task ReplaceAllVocals(int skinIndex)
