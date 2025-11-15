@@ -2,6 +2,7 @@
 
 namespace HasteVocalSfxSwapMod.Model;
 
+[JsonObject(MemberSerialization.OptIn)]
 public record SfxInstanceSwapConfig
 {
     [JsonProperty("basePath")]
@@ -14,12 +15,14 @@ public record SfxInstanceSwapConfig
     public SfxSettingsSwap? Settings;
 }
 
+[JsonObject(MemberSerialization.OptIn)]
 public record SfxSettingsSwap
 {
     [JsonProperty("volumeMultiplier")]
     public float VolumeMultiplier = 1f;
 }
 
+[JsonObject(MemberSerialization.OptIn)]
 public record VocalSfxSwapSkinConfig
 {
     public int SkinIndex;
