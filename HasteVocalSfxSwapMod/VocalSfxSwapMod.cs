@@ -1,5 +1,5 @@
 ﻿using HasteVocalSfxSwapMod.Model;
-﻿using Landfall.Haste;
+using Landfall.Haste;
 using Landfall.Modding;
 using Newtonsoft.Json;
 using System.Collections.ObjectModel;
@@ -96,7 +96,7 @@ public class VocalSfxSwapMod
         return $"interaction{field.Name.Substring(0, 1).ToUpper()}{field.Name.Substring(1)}";
     }
 
-    private static void LoadVocalSfxs(string directory)
+    public static void LoadVocalSfxs(string modDirectory)
     {
         Dictionary<int, Dictionary<string, List<string>>> foundSoundFilesPerSkinPerSfx = [];
 
@@ -202,16 +202,14 @@ public class VocalSfxSwapMod
                                 string[] paths = [];
                                 if (skinConfig.BasePath != null)
                                 {
-                                    paths = [..paths,  skinConfig.BasePath];
+                                    paths = [.. paths, skinConfig.BasePath];
                                 }
                                 if (swapConfig.BasePath != null)
                                 {
                                     paths = [.. paths, swapConfig.BasePath];
                                 }
 
-                                paths = [configDirectoryBasePath, ..paths, soundFilePath];
-
-                                return Path.Combine(paths);
+                                return Path.Combine([configDirectoryBasePath, .. paths, soundFilePath]);
                             })
                             .ToArray();
                     }
@@ -226,7 +224,7 @@ public class VocalSfxSwapMod
             }
         }
 
-        foreach (var filePath in Directory.GetFiles(directory))
+        foreach (var filePath in Directory.GetFiles(modDirectory))
         {
             if (SupportedAudioFormats.ContainsKey(Path.GetExtension(filePath)))
             {
@@ -286,6 +284,11 @@ public class VocalSfxSwapMod
                 }");
             }
         }
+    }
+
+    public static void LoadVocalSfxs(int skinIndex, VocalSfxSwapSkinConfig skinConfig)
+    {
+        skinConfigs[skinIndex] = skinConfig;
     }
 
     public static async Task ReplaceAllVocals(int skinIndex)
