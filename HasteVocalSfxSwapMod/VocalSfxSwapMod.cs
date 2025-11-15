@@ -180,6 +180,8 @@ public class VocalSfxSwapMod
                     return;
                 }
 
+                skinConfig.SkinIndex = skinIndex;
+
                 var configDirectoryBasePath = Path.GetDirectoryName(configFilePath);
 
                 if (skinConfig.Swaps != null)
@@ -249,6 +251,7 @@ public class VocalSfxSwapMod
             {
                 var skinConfig = new VocalSfxSwapSkinConfig()
                 {
+                    SkinIndex = skinIndex,
                     Swaps = swaps
                 };
                 skinConfigs.Add(skinIndex, skinConfig);
@@ -296,29 +299,39 @@ public class VocalSfxSwapMod
     }
     }
 
-    public static void RegisterSkinConfig(int skinIndex, VocalSfxSwapSkinConfig skinConfig)
+    public static void RegisterSkinConfig(VocalSfxSwapSkinConfig skinConfig)
     {
-        skinConfigs[skinIndex] = skinConfig;
+        skinConfigs[skinConfig.SkinIndex] = skinConfig;
 
-        skinVocalBankCache.Remove(skinIndex);
-        skinInteractionVocalBankCache.Remove(skinIndex);
+        skinVocalBankCache.Remove(skinConfig.SkinIndex);
+        skinInteractionVocalBankCache.Remove(skinConfig.SkinIndex);
     }
 
     public static async Task ReplaceAllVocals(int skinIndex)
     {
+        VocalSfxSwapSkinConfig? skinConfig = skinConfigs.GetValueOrDefault(skinIndex);
+
         await Task.WhenAll([
-            ReplaceVocals(skinIndex),
-            ReplaceInteractionVocals(skinIndex)
+            ReplaceVocals(skinConfig),
+            ReplaceInteractionVocals(skinConfig)
         ]);
     }
 
-    public static async Task ReplaceVocals(int skinIndex)
+    public static async Task ReplaceAllVocals(VocalSfxSwapSkinConfig? skinConfig)
+    {
+        await Task.WhenAll([
+            ReplaceVocals(skinConfig),
+            ReplaceInteractionVocals(skinConfig)
+        ]);
+    }
+
+    public static async Task ReplaceVocals(VocalSfxSwapSkinConfig? skinConfig)
     {
         await replaceVocalsSemaphore.WaitAsync();
 
         try
         {
-            await ForceReplaceVocals(skinIndex);
+            await ForceReplaceVocals(skinConfig);
         }
         catch (Exception error)
         {
@@ -330,7 +343,7 @@ public class VocalSfxSwapMod
         }
     }
 
-    private static async Task ForceReplaceVocals(int skinIndex)
+    private static async Task ForceReplaceVocals(VocalSfxSwapSkinConfig? skinConfig)
     {
         if (PlayerVocalSFX.Instance == null)
         {
@@ -343,46 +356,44 @@ public class VocalSfxSwapMod
             baseZoeVocalBank = PlayerVocalSFX.Instance.vocalBank;
         }
 
-        if (!skinConfigs.ContainsKey(skinIndex))
+        if (skinConfig == null)
         {
             Debug.Log($"[{nameof(VocalSfxSwapMod)}] Reset vocal bank to Zoe's default vocal bank");
             PlayerVocalSFX.Instance.vocalBank = baseZoeVocalBank;
             return;
         }
 
-        var skinConfig = skinConfigs[skinIndex];
-
         VocalBank skinVocalBank;
-        if (!skinVocalBankCache.ContainsKey(skinIndex))
+        if (!skinVocalBankCache.ContainsKey(skinConfig.SkinIndex))
         {
             Debug.Log($"[{nameof(VocalSfxSwapMod)}] Skin vocal bank not found in cache. Creating a new one...");
 
-            skinVocalBank = await GenerateSkinVocalBank(baseZoeVocalBank, skinIndex, skinConfig);
-            skinVocalBankCache[skinIndex] = skinVocalBank;
+            skinVocalBank = await GenerateSkinVocalBank(baseZoeVocalBank, skinConfig);
+            skinVocalBankCache[skinConfig.SkinIndex] = skinVocalBank;
         }
         else
         {
-            skinVocalBank = skinVocalBankCache[skinIndex];
+            skinVocalBank = skinVocalBankCache[skinConfig.SkinIndex];
         }
 
         Debug.Log($"[{nameof(VocalSfxSwapMod)}] Set new skin vocal bank: {skinVocalBank}");
         PlayerVocalSFX.Instance.vocalBank = skinVocalBank;
     }
 
-    public static async Task<VocalBank> GenerateSkinVocalBank(int skinIndex, VocalSfxSwapSkinConfig config)
+    public static async Task<VocalBank> GenerateSkinVocalBank(VocalSfxSwapSkinConfig skinConfig)
     {
         if (BaseZoeVocalBank == null)
         {
             throw new Exception("Missing Zoe's base vocal bank");
         }
 
-        return await GenerateSkinVocalBank(BaseZoeVocalBank, skinIndex, config);
+        return await GenerateSkinVocalBank(BaseZoeVocalBank, skinConfig);
     }
 
-    public static async Task<VocalBank> GenerateSkinVocalBank(VocalBank baseVocalBank, int skinIndex, VocalSfxSwapSkinConfig config)
+    public static async Task<VocalBank> GenerateSkinVocalBank(VocalBank baseVocalBank, VocalSfxSwapSkinConfig skinConfig)
     {
         var vocalBank = ScriptableObject.CreateInstance<VocalBank>();
-        vocalBank.name = $"{baseVocalBank.name} Skin {skinIndex}";
+        vocalBank.name = $"{baseVocalBank.name} Skin {skinConfig.SkinIndex}";
 
         // Copy all SFX_Instances from Zoe's base vocal bank to the new voice bank
         foreach (var fieldInfo in typeof(VocalBank).GetFields())
@@ -395,7 +406,7 @@ public class VocalSfxSwapMod
             fieldInfo.SetValue(vocalBank, fieldInfo.GetValue(baseVocalBank));
         }
 
-        if (config.Swaps == null)
+        if (skinConfig.Swaps == null)
         {
             // What's the point? lol
             return vocalBank;
@@ -405,16 +416,16 @@ public class VocalSfxSwapMod
         foreach (var field in vocalBankSfxInstanceFields)
         {
             var sfxName = VocalBankFieldToSfxName(field);
-            if (!config.Swaps.ContainsKey(sfxName))
+            if (!skinConfig.Swaps.ContainsKey(sfxName))
             {
                 continue;
             }
 
-            var swapConfig = config.Swaps[sfxName];
+            var swapConfig = skinConfig.Swaps[sfxName];
 
             var oldSfxInstance = (SFX_Instance)field.GetValue(vocalBank);
 
-            SFX_Instance sfxInstance = await GenerateSfxInstance(oldSfxInstance, skinIndex, swapConfig);
+            SFX_Instance sfxInstance = await GenerateSfxInstance(oldSfxInstance, skinConfig.SkinIndex, swapConfig);
             field.SetValue(vocalBank, sfxInstance);
         }
 
@@ -424,13 +435,13 @@ public class VocalSfxSwapMod
     }
 
 
-    public static async Task ReplaceInteractionVocals(int skinIndex)
+    public static async Task ReplaceInteractionVocals(VocalSfxSwapSkinConfig? skinConfig)
     {
         await replaceInteractionVocalsSemaphore.WaitAsync();
 
         try
         {
-            await ForceReplaceInteractionVocals(skinIndex);
+            await ForceReplaceInteractionVocals(skinConfig);
         }
         catch (Exception error)
         {
@@ -442,52 +453,50 @@ public class VocalSfxSwapMod
         }
     }
 
-    private static async Task ForceReplaceInteractionVocals(int skinIndex)
+    private static async Task ForceReplaceInteractionVocals(VocalSfxSwapSkinConfig? skinConfig)
     {
         if (baseZoeInteractionVocalBank == null)
         {
             baseZoeInteractionVocalBank = InteractionCharacterDatabase.Instance.courier.VocalBank;
         }
 
-        if (!skinConfigs.ContainsKey(skinIndex))
+        if (skinConfig == null)
         {
             Debug.Log($"[{nameof(VocalSfxSwapMod)}] Reset vocal bank to Zoe's default interaction vocal bank");
             InteractionCharacterDatabase.Instance.courier.VocalBank = baseZoeInteractionVocalBank;
             return;
         }
 
-        var skinConfig = skinConfigs[skinIndex];
-
         InteractionVocalBank skinInteractionVocalBank;
-        if (!skinInteractionVocalBankCache.ContainsKey(skinIndex))
+        if (!skinInteractionVocalBankCache.ContainsKey(skinConfig.SkinIndex))
         {
             Debug.Log($"[{nameof(VocalSfxSwapMod)}] Skin interaction vocal bank not found in cache. Creating a new one...");
 
-            skinInteractionVocalBank = await GenerateSkinInteractionVocalBank(baseZoeInteractionVocalBank, skinIndex, skinConfig);
-            skinInteractionVocalBankCache[skinIndex] = skinInteractionVocalBank;
+            skinInteractionVocalBank = await GenerateSkinInteractionVocalBank(baseZoeInteractionVocalBank, skinConfig);
+            skinInteractionVocalBankCache[skinConfig.SkinIndex] = skinInteractionVocalBank;
         }
         else
         {
-            skinInteractionVocalBank = skinInteractionVocalBankCache[skinIndex];
+            skinInteractionVocalBank = skinInteractionVocalBankCache[skinConfig.SkinIndex];
         }
 
         InteractionCharacterDatabase.Instance.courier.VocalBank = skinInteractionVocalBank;
     }
 
-    public static async Task<InteractionVocalBank> GenerateSkinInteractionVocalBank(int skinIndex, VocalSfxSwapSkinConfig config)
+    public static async Task<InteractionVocalBank> GenerateSkinInteractionVocalBank(VocalSfxSwapSkinConfig skinConfig)
     {
         if (BaseZoeInteractionVocalBank == null)
         {
             throw new Exception("Missing Zoe's base interaction vocal bank");
         }
 
-        return await GenerateSkinInteractionVocalBank(BaseZoeInteractionVocalBank, skinIndex, config);
+        return await GenerateSkinInteractionVocalBank(BaseZoeInteractionVocalBank, skinConfig);
     }
 
-    public static async Task<InteractionVocalBank> GenerateSkinInteractionVocalBank(InteractionVocalBank baseInteractionVocalBank, int skinIndex, VocalSfxSwapSkinConfig config)
+    public static async Task<InteractionVocalBank> GenerateSkinInteractionVocalBank(InteractionVocalBank baseInteractionVocalBank, VocalSfxSwapSkinConfig skinConfig)
     {
         var interactionVocalBank = ScriptableObject.CreateInstance<InteractionVocalBank>();
-        interactionVocalBank.name = $"{baseInteractionVocalBank.name} Skin {skinIndex}";
+        interactionVocalBank.name = $"{baseInteractionVocalBank.name} Skin {skinConfig.SkinIndex}";
 
         // Copy all SFX_Instances from Zoe's base interaction vocal bank to the new interaction voice bank
         foreach (var fieldInfo in interactionVocalBankSfxInstanceFields)
@@ -495,7 +504,7 @@ public class VocalSfxSwapMod
             fieldInfo.SetValue(interactionVocalBank, fieldInfo.GetValue(baseInteractionVocalBank));
         }
 
-        if (config.Swaps == null)
+        if (skinConfig.Swaps == null)
         {
             // What's the point? lol
             return interactionVocalBank;
@@ -505,16 +514,16 @@ public class VocalSfxSwapMod
         foreach (var field in interactionVocalBankSfxInstanceFields)
         {
             var sfxName = InteractionVocalBankFieldToSfxName(field);
-            if (!config.Swaps.ContainsKey(sfxName))
+            if (!skinConfig.Swaps.ContainsKey(sfxName))
             {
                 continue;
             }
 
-            var swapConfig = config.Swaps[sfxName];
+            var swapConfig = skinConfig.Swaps[sfxName];
 
             var oldSfxInstance = (SFX_Instance)field.GetValue(interactionVocalBank);
 
-            SFX_Instance sfxInstance = await GenerateSfxInstance(oldSfxInstance, skinIndex, swapConfig);
+            SFX_Instance sfxInstance = await GenerateSfxInstance(oldSfxInstance, skinConfig.SkinIndex, swapConfig);
             field.SetValue(interactionVocalBank, sfxInstance);
         }
 

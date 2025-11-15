@@ -6,8 +6,10 @@ public record SfxInstanceSwapConfig
 {
     [JsonProperty("basePath")]
     public string? BasePath;
+    
     [JsonProperty("clips")]
     public string[]? Clips;
+    
     [JsonProperty("settings")]
     public SfxSettingsSwap? Settings;
 }
@@ -20,8 +22,11 @@ public record SfxSettingsSwap
 
 public record VocalSfxSwapSkinConfig
 {
+    public int SkinIndex;
+
     [JsonProperty("basePath")]
     public string? BasePath;
+
     [JsonProperty("swaps")]
     public Dictionary<string, SfxInstanceSwapConfig>? Swaps;
 }
