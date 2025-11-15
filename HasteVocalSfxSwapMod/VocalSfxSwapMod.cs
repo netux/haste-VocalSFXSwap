@@ -1,6 +1,7 @@
 ﻿using Landfall.Haste;
 using Landfall.Modding;
 using Newtonsoft.Json;
+using System.Collections.ObjectModel;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -17,6 +18,15 @@ public class VocalSfxSwapMod
     private static readonly FieldInfo[] interactionVocalBankSfxInstanceFields = typeof(InteractionVocalBank).GetFields()
         .Where((field) => field.FieldType == typeof(SFX_Instance))
         .ToArray();
+
+    public static readonly ReadOnlyDictionary<string, SupportedAudioFormat> SupportedAudioFormats = new(
+        new Dictionary<string, SupportedAudioFormat>()
+        {
+            [".wav"] = new(UnityFormat: AudioType.WAV),
+            [".ogg"] = new(UnityFormat: AudioType.OGGVORBIS),
+            [".mp3"] = new(UnityFormat: AudioType.MPEG),
+        }
+    );
 
     public static readonly Dictionary<int, VocalSfxSwapSkinConfig> skinConfigs = [];
 
@@ -89,11 +99,12 @@ public class VocalSfxSwapMod
     {
         Dictionary<int, Dictionary<string, List<string>>> foundSoundFilesPerSkinPerSfx = [];
 
-        void TryStoreWavFile(string wavFilePath)
+        void TryStoreAudioFile(string audioFilePath)
         {
-            // (name).(skin index).(sfx name).wav
-            // (name).(skin index).(sfx name).(number).wav
-            var split = Path.GetFileName(wavFilePath).Split(".");
+            // (name).(skin index).(sfx name).(ext)
+            // (name).(skin index).(sfx name).(number).(ext)
+            var split = Path.GetFileName(audioFilePath).Split(".");
+
 
             if (split.Length < 4 || split.Length > 5)
             {
@@ -134,7 +145,7 @@ public class VocalSfxSwapMod
                         replacements[sfxName] = clipPaths;
                     }
 
-                    clipPaths.Add(wavFilePath);
+                    clipPaths.Add(audioFilePath);
                     break;
                 }
             }
@@ -216,9 +227,9 @@ public class VocalSfxSwapMod
 
         foreach (var filePath in Directory.GetFiles(directory))
         {
-            if (filePath.EndsWith(".wav"))
+            if (SupportedAudioFormats.ContainsKey(Path.GetExtension(filePath)))
             {
-                TryStoreWavFile(filePath);
+                TryStoreAudioFile(filePath);
             }
             else if (filePath.EndsWith(".hastevocalssfx.json"))
             {
@@ -276,18 +287,12 @@ public class VocalSfxSwapMod
         }
     }
 
-    private static async Task<AudioClip?> LoadAudioClipFromPath(string path)
+    public static async Task ReplaceAllVocals(int skinIndex)
     {
-        using UnityWebRequest uwr = UnityWebRequestMultimedia.GetAudioClip(path, AudioType.WAV);
-        await uwr.SendWebRequest();
-
-        if (uwr.result == UnityWebRequest.Result.ConnectionError || uwr.result == UnityWebRequest.Result.DataProcessingError)
-        {
-            Debug.Log($"[{nameof(VocalSfxSwapMod)}] Could not load audio clip at \"{path}\": {uwr.error}");
-            return null;
-        }
-
-        return DownloadHandlerAudioClip.GetContent(uwr);
+        await Task.WhenAll([
+            ReplaceVocals(skinIndex),
+            ReplaceInteractionVocals(skinIndex)
+        ]);
     }
 
     public static async Task ReplaceVocals(int skinIndex)
@@ -501,6 +506,24 @@ public class VocalSfxSwapMod
         return interactionVocalBank;
     }
 
+    private static async Task<AudioClip?> LoadAudioClipFromPath(string path)
+    {
+        if (!SupportedAudioFormats.TryGetValue(Path.GetExtension(path), out SupportedAudioFormat format))
+        {
+            throw new Exception("Unsupported file extension");
+        }
+
+        using UnityWebRequest uwr = UnityWebRequestMultimedia.GetAudioClip(path, format.UnityFormat);
+        await uwr.SendWebRequest();
+
+        if (uwr.result == UnityWebRequest.Result.ConnectionError || uwr.result == UnityWebRequest.Result.DataProcessingError)
+        {
+            throw new Exception(uwr.error);
+        }
+
+        return DownloadHandlerAudioClip.GetContent(uwr);
+    }
+
     private static async Task<SFX_Instance> GenerateSfxInstance(SFX_Instance baseSfxInstance, int skinIndex, SfxInstanceSwapConfig config)
     {
         var sfxInstance = ScriptableObject.CreateInstance<SFX_Instance>();
@@ -526,7 +549,8 @@ public class VocalSfxSwapMod
         {
             var fullPath = Path.GetFullPath(path);
 
-            AudioClip? clip;
+            AudioClip? clip = null;
+
             if (pathToAudioClipCache.ContainsKey(fullPath))
             {
                 clip = pathToAudioClipCache[fullPath];
@@ -535,19 +559,24 @@ public class VocalSfxSwapMod
             {
                 Debug.Log($"[{nameof(VocalSfxSwapMod)}] Loading new AudioClip {path}");
 
-                var loadedClip = await LoadAudioClipFromPath(path);
-                if (loadedClip == null)
+                try
                 {
-                    continue;
+                    var loadedClip = await LoadAudioClipFromPath(path);
+                    if (loadedClip == null)
+                    {
+                        continue;
+                    }
+
+                    clip = loadedClip;
+                    clip.name = $"VocalSfx {Path.GetFileNameWithoutExtension(fullPath)}";
+
+                    pathToAudioClipCache.Add(fullPath, clip);
+                    Debug.Log($"[{nameof(VocalSfxSwapMod)}] Successfully loaded AudioClip {path}");
                 }
-
-                clip = loadedClip;
-                clip.name = $"VocalSfx {Path.GetFileNameWithoutExtension(fullPath)}";
-
-                pathToAudioClipCache.Add(fullPath, clip);
-
-                Debug.Log($"[{nameof(VocalSfxSwapMod)}] Successfully loaded AudioClip {path}");
-
+                catch (Exception error)
+                {
+                    Debug.LogError($"[{nameof(VocalSfxSwapMod)}] Could not load AudioClip {path}: {error}");
+                }
             }
 
             if (clip == null)
@@ -560,14 +589,6 @@ public class VocalSfxSwapMod
         sfxInstance.clips = clips.ToArray();
 
         return sfxInstance;
-    }
-
-    public static async Task ReplaceAllVocals(int skinIndex)
-    {
-        await Task.WhenAll([
-            ReplaceVocals(skinIndex),
-            ReplaceInteractionVocals(skinIndex)
-        ]);
     }
 
     [Zorro.Core.CLI.ConsoleCommand]
@@ -646,3 +667,5 @@ public record VocalSfxSwapSkinConfig
     [JsonProperty("swaps")]
     public Dictionary<string, SfxInstanceSwapConfig>? Swaps;
 }
+
+public record SupportedAudioFormat(AudioType UnityFormat);
