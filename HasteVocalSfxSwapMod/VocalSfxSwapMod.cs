@@ -1,3 +1,4 @@
+﻿using HasteVocalSfxSwapMod.Model;
 ﻿using Landfall.Haste;
 using Landfall.Modding;
 using Newtonsoft.Json;
@@ -643,29 +644,3 @@ public class VocalSfxSwapMod
         original(interactionVocalPlayer, sfx);
     }
 }
-
-public record SfxInstanceSwapConfig
-{
-    [JsonProperty("basePath")]
-    public string? BasePath;
-    [JsonProperty("clips")]
-    public string[]? Clips;
-    [JsonProperty("settings")]
-    public SfxSettingsSwap? Settings;
-}
-
-public record SfxSettingsSwap
-{
-    [JsonProperty("volumeMultiplier")]
-    public float VolumeMultiplier = 1f;
-}
-
-public record VocalSfxSwapSkinConfig
-{
-    [JsonProperty("basePath")]
-    public string? BasePath;
-    [JsonProperty("swaps")]
-    public Dictionary<string, SfxInstanceSwapConfig>? Swaps;
-}
-
-public record SupportedAudioFormat(AudioType UnityFormat);
