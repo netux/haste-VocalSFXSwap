@@ -473,6 +473,7 @@ public class VocalSfxSwapMod
     public static async Task<VocalBank> GenerateSkinVocalBank(VocalBank baseVocalBank, VocalSfxSwapConfig config)
     {
         var vocalBank = ScriptableObject.CreateInstance<VocalBank>();
+        UnityEngine.Object.DontDestroyOnLoad(vocalBank);
         vocalBank.name = $"{baseVocalBank.name} {config}";
 
         // Copy all SFX_Instances from Zoe's base vocal bank to the new voice bank
@@ -508,8 +509,6 @@ public class VocalSfxSwapMod
             SFX_Instance sfxInstance = await GenerateSfxInstance(oldSfxInstance, config.SkinIndex, swapConfig);
             field.SetValue(vocalBank, sfxInstance);
         }
-
-        UnityEngine.Object.DontDestroyOnLoad(vocalBank);
 
         return vocalBank;
     }
@@ -578,6 +577,7 @@ public class VocalSfxSwapMod
     public static async Task<InteractionVocalBank> GenerateSkinInteractionVocalBank(InteractionVocalBank baseInteractionVocalBank, VocalSfxSwapConfig config)
     {
         var interactionVocalBank = ScriptableObject.CreateInstance<InteractionVocalBank>();
+        UnityEngine.Object.DontDestroyOnLoad(interactionVocalBank);
         interactionVocalBank.name = $"{baseInteractionVocalBank.name} {config}";
 
         // Copy all SFX_Instances from Zoe's base interaction vocal bank to the new interaction voice bank
@@ -608,8 +608,6 @@ public class VocalSfxSwapMod
             SFX_Instance sfxInstance = await GenerateSfxInstance(oldSfxInstance, config.SkinIndex, swapConfig);
             field.SetValue(interactionVocalBank, sfxInstance);
         }
-
-        UnityEngine.Object.DontDestroyOnLoad(interactionVocalBank);
 
         return interactionVocalBank;
     }
