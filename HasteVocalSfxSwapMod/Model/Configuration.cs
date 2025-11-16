@@ -23,13 +23,18 @@ public record SfxSettingsSwap
 }
 
 [JsonObject(MemberSerialization.OptIn)]
-public record VocalSfxSwapSkinConfig
+public record VocalSfxSwapConfig
 {
-    public int SkinIndex;
+    public int? SkinIndex;
 
     [JsonProperty("basePath")]
     public string? BasePath;
 
     [JsonProperty("swaps")]
     public Dictionary<string, SfxInstanceSwapConfig>? Swaps;
+
+    public override string ToString()
+    {
+        return SkinIndex.HasValue ? $"Skin {SkinIndex} Swap" : "Default Swap";
+    }
 }
