@@ -647,7 +647,48 @@ public class VocalSfxSwapMod
                 settingField.SetValue(sfxInstance.settings, settingField.GetValue(baseSfxInstance.settings));
             }
 
-            sfxInstance.settings.volume *= config.Settings.VolumeMultiplier;
+            if (config.Settings.Volume.HasValue)
+            {
+                sfxInstance.settings.volume = Math.Clamp(config.Settings.Volume.Value, 0, 1);
+            }
+            if (config.Settings.VolumeVariation.HasValue)
+            {
+                sfxInstance.settings.volume_Variation = Math.Clamp(config.Settings.VolumeVariation.Value, 0, 1);
+            }
+
+            if (config.Settings.Pitch.HasValue)
+            {
+                sfxInstance.settings.pitch = config.Settings.Pitch.Value;
+            }
+            if (config.Settings.PitchVariation.HasValue)
+            {
+                sfxInstance.settings.pitch_Variation = Math.Clamp(config.Settings.PitchVariation.Value, 0, 1);
+            }
+
+            if (config.Settings.Range.HasValue)
+            {
+                sfxInstance.settings.range = config.Settings.Range.Value;
+            }
+
+            if (config.Settings.CooldownSeconds.HasValue)
+            {
+                sfxInstance.settings.cooldown = config.Settings.CooldownSeconds.Value;
+            }
+
+            if (config.Settings.SpatialBlend.HasValue)
+            {
+                sfxInstance.settings.spatialBlend = Math.Clamp(config.Settings.SpatialBlend.Value, 0, 1);
+            }
+
+            if (config.Settings.DopplerLevel.HasValue)
+            {
+                sfxInstance.settings.dopplerLevel = Math.Clamp(config.Settings.DopplerLevel.Value, 0, 1);
+            }
+
+            if (config.Settings.HighPriority.HasValue)
+            {
+                sfxInstance.settings.highPrio = config.Settings.HighPriority.Value;
+            }
         }
 
         List<AudioClip> clips = [];
@@ -722,19 +763,35 @@ public class VocalSfxSwapMod
             BasePath = "",
             Swaps = new(
                 vocalBankSfxInstanceFields
-                    .Select(VocalBankFieldToSfxName)
+                    .Select((field) =>
+                    {
+                        SFX_Settings baseZoeSfxSettings = ((SFX_Instance)field.GetValue(BaseZoeVocalBank)).settings;
+
+                        return new KeyValuePair<string, SfxInstanceSwapConfig>(
+                            VocalBankFieldToSfxName(field),
+                            new()
+                            {
+                                Clips = [],
+                                Settings = SfxSettingsSwap.FromSfxSettings(baseZoeSfxSettings)
+                            }
+                        );
+                    })
                     .Concat(
-                        interactionVocalBankSfxInstanceFields.Select(InteractionVocalBankFieldToSfxName)
-                    )
-                    .OrderBy((name) => name) // alphabetical
-                    .Select((name) => new KeyValuePair<string, SfxInstanceSwapConfig>(
-                        name,
-                        new()
+                        interactionVocalBankSfxInstanceFields.Select((field) =>
                         {
-                            Clips = [],
-                            Settings = new()
-                        }
-                    ))
+                            SFX_Settings baseZoeSfxSettings = ((SFX_Instance)field.GetValue(BaseZoeInteractionVocalBank)).settings;
+
+                            return new KeyValuePair<string, SfxInstanceSwapConfig>(
+                                InteractionVocalBankFieldToSfxName(field),
+                                new()
+                                {
+                                    Clips = [],
+                                    Settings = SfxSettingsSwap.FromSfxSettings(baseZoeSfxSettings)
+                                }
+                            );
+                        })
+                    )
+                    .OrderBy((kvp) => kvp.Key) // alphabetical
             )
         };
 
