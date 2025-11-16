@@ -3,7 +3,6 @@ using Landfall.Haste;
 using Landfall.Modding;
 using Newtonsoft.Json;
 using System.Collections.ObjectModel;
-using System.Reflection;
 using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.SceneManagement;
@@ -13,15 +12,6 @@ namespace HasteVocalSfxSwapMod;
 [LandfallPlugin]
 public class VocalSfxSwapMod
 {
-    private const int DefaultConfigSkinCacheIndex = -1;
-
-    private static readonly FieldInfo[] vocalBankSfxInstanceFields = typeof(VocalBank).GetFields()
-        .Where((field) => field.FieldType == typeof(SFX_Instance))
-        .ToArray();
-    private static readonly FieldInfo[] interactionVocalBankSfxInstanceFields = typeof(InteractionVocalBank).GetFields()
-        .Where((field) => field.FieldType == typeof(SFX_Instance))
-        .ToArray();
-
     public static readonly ReadOnlyDictionary<string, SupportedAudioFormat> SupportedAudioFormats = new(
         new Dictionary<string, SupportedAudioFormat>()
         {
@@ -98,26 +88,6 @@ public class VocalSfxSwapMod
         };
     }
 
-    private static int SkinIndexToCacheIndex(int? skinIndex)
-    {
-        if (!skinIndex.HasValue)
-        {
-            return DefaultConfigSkinCacheIndex;
-        }
-
-        return skinIndex.Value;
-    }
-
-    private static string VocalBankFieldToSfxName(FieldInfo field)
-    {
-        return field.Name.Remove(field.Name.IndexOf("Vocals"), "Vocals".Length);
-    }
-
-    private static string InteractionVocalBankFieldToSfxName(FieldInfo field)
-    {
-        return $"interaction{field.Name.Substring(0, 1).ToUpper()}{field.Name.Substring(1)}";
-    }
-
     public static void RegisterConfigsInDirectory(string modDirectory)
     {
         HashSet<int> cacheIndicesToReload = [];
@@ -163,9 +133,9 @@ public class VocalSfxSwapMod
                 replacements = foundSoundFilesPerSkinPerSfx[skinIndexKey];
             }
 
-            foreach (var field in vocalBankSfxInstanceFields)
+            foreach (var field in Util.VocalBankSfxInstanceFields)
             {
-                var sfxName = VocalBankFieldToSfxName(field);
+                var sfxName = Util.VocalBankFieldToSfxName(field);
                 if (sfxNameInFileName.ToLower() == sfxName.ToLower())
                 {
                     List<string> clipPaths;
@@ -267,7 +237,7 @@ public class VocalSfxSwapMod
                     Debug.Log($"[{nameof(VocalSfxSwapMod)}] Loaded default vocal sfx config file: {configFilePath}");
                 }
 
-                cacheIndicesToReload.Add(SkinIndexToCacheIndex(skinIndex));
+                cacheIndicesToReload.Add(Util.SkinIndexToCacheIndex(skinIndex));
             }
             catch (JsonException error)
             {
@@ -360,7 +330,7 @@ public class VocalSfxSwapMod
                     )}");
             }
 
-            cacheIndicesToReload.Add(SkinIndexToCacheIndex(skinIndex));
+            cacheIndicesToReload.Add(Util.SkinIndexToCacheIndex(skinIndex));
         }
 
         foreach (var skinIndex in cacheIndicesToReload)
@@ -441,7 +411,7 @@ public class VocalSfxSwapMod
             return;
         }
 
-        var skinCacheIndex = SkinIndexToCacheIndex(config.SkinIndex);
+        var skinCacheIndex = Util.SkinIndexToCacheIndex(config.SkinIndex);
 
         VocalBank skinVocalBank;
         if (!vocalBankCache.ContainsKey(skinCacheIndex))
@@ -494,9 +464,9 @@ public class VocalSfxSwapMod
         }
 
         // Create new SFX_Instances for replacement SFX clips
-        foreach (var field in vocalBankSfxInstanceFields)
+        foreach (var field in Util.VocalBankSfxInstanceFields)
         {
-            var sfxName = VocalBankFieldToSfxName(field);
+            var sfxName = Util.VocalBankFieldToSfxName(field);
             if (!config.Swaps.ContainsKey(sfxName))
             {
                 continue;
@@ -546,7 +516,7 @@ public class VocalSfxSwapMod
             return;
         }
 
-        var skinCacheIndex = SkinIndexToCacheIndex(config.SkinIndex);
+        var skinCacheIndex = Util.SkinIndexToCacheIndex(config.SkinIndex);
 
         InteractionVocalBank skinInteractionVocalBank;
         if (!interactionVocalBankCache.ContainsKey(skinCacheIndex))
@@ -581,7 +551,7 @@ public class VocalSfxSwapMod
         interactionVocalBank.name = $"{baseInteractionVocalBank.name} {config}";
 
         // Copy all SFX_Instances from Zoe's base interaction vocal bank to the new interaction voice bank
-        foreach (var fieldInfo in interactionVocalBankSfxInstanceFields)
+        foreach (var fieldInfo in Util.InteractionVocalBankSfxInstanceFields)
         {
             fieldInfo.SetValue(interactionVocalBank, fieldInfo.GetValue(baseInteractionVocalBank));
         }
@@ -593,9 +563,9 @@ public class VocalSfxSwapMod
         }
 
         // Create new SFX_Instances for replacement SFX clips
-        foreach (var field in interactionVocalBankSfxInstanceFields)
+        foreach (var field in Util.InteractionVocalBankSfxInstanceFields)
         {
-            var sfxName = InteractionVocalBankFieldToSfxName(field);
+            var sfxName = Util.InteractionVocalBankFieldToSfxName(field);
             if (!config.Swaps.ContainsKey(sfxName))
             {
                 continue;
@@ -742,10 +712,10 @@ public class VocalSfxSwapMod
     public static void ListVocalSfxNames()
     {
         Debug.Log(
-            string.Join("\n", vocalBankSfxInstanceFields
-                .Select(VocalBankFieldToSfxName)
+            string.Join("\n", Util.VocalBankSfxInstanceFields
+                .Select(Util.VocalBankFieldToSfxName)
                 .Concat(
-                    interactionVocalBankSfxInstanceFields.Select(InteractionVocalBankFieldToSfxName)
+                    Util.InteractionVocalBankSfxInstanceFields.Select(Util.InteractionVocalBankFieldToSfxName)
                 )
                 .OrderBy((name) => name) // alphabetical
                 .Select((name) => $"- {name}")
@@ -762,13 +732,13 @@ public class VocalSfxSwapMod
         {
             BasePath = "",
             Swaps = new(
-                vocalBankSfxInstanceFields
+                Util.VocalBankSfxInstanceFields
                     .Select((field) =>
                     {
                         SFX_Settings baseZoeSfxSettings = ((SFX_Instance)field.GetValue(BaseZoeVocalBank)).settings;
 
                         return new KeyValuePair<string, SfxInstanceSwapConfig>(
-                            VocalBankFieldToSfxName(field),
+Util.VocalBankFieldToSfxName(field),
                             new()
                             {
                                 Clips = [],
@@ -777,12 +747,12 @@ public class VocalSfxSwapMod
                         );
                     })
                     .Concat(
-                        interactionVocalBankSfxInstanceFields.Select((field) =>
+                        Util.InteractionVocalBankSfxInstanceFields.Select((field) =>
                         {
                             SFX_Settings baseZoeSfxSettings = ((SFX_Instance)field.GetValue(BaseZoeInteractionVocalBank)).settings;
 
                             return new KeyValuePair<string, SfxInstanceSwapConfig>(
-                                InteractionVocalBankFieldToSfxName(field),
+Util.InteractionVocalBankFieldToSfxName(field),
                                 new()
                                 {
                                     Clips = [],
