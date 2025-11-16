@@ -448,7 +448,7 @@ public class VocalSfxSwapMod
         {
             Debug.Log($"[{nameof(VocalSfxSwapMod)}] Skin vocal bank not found in cache. Creating a new one...");
 
-            skinVocalBank = await GenerateSkinVocalBank(baseZoeVocalBank, config);
+            skinVocalBank = await GenerateVocalBank(baseZoeVocalBank, config);
             vocalBankCache[skinCacheIndex] = skinVocalBank;
         }
         else
@@ -460,17 +460,17 @@ public class VocalSfxSwapMod
         PlayerVocalSFX.Instance.vocalBank = skinVocalBank;
     }
 
-    public static async Task<VocalBank> GenerateSkinVocalBank(VocalSfxSwapConfig config)
+    public static async Task<VocalBank> GenerateVocalBank(VocalSfxSwapConfig config)
     {
         if (BaseZoeVocalBank == null)
         {
             throw new Exception("Missing Zoe's base vocal bank");
         }
 
-        return await GenerateSkinVocalBank(BaseZoeVocalBank, config);
+        return await GenerateVocalBank(BaseZoeVocalBank, config);
     }
 
-    public static async Task<VocalBank> GenerateSkinVocalBank(VocalBank baseVocalBank, VocalSfxSwapConfig config)
+    public static async Task<VocalBank> GenerateVocalBank(VocalBank baseVocalBank, VocalSfxSwapConfig config)
     {
         var vocalBank = ScriptableObject.CreateInstance<VocalBank>();
         UnityEngine.Object.DontDestroyOnLoad(vocalBank);
@@ -553,7 +553,7 @@ public class VocalSfxSwapMod
         {
             Debug.Log($"[{nameof(VocalSfxSwapMod)}] Skin interaction vocal bank not found in cache. Creating a new one...");
 
-            skinInteractionVocalBank = await GenerateSkinInteractionVocalBank(baseZoeInteractionVocalBank, config);
+            skinInteractionVocalBank = await GenerateInteractionVocalBank(baseZoeInteractionVocalBank, config);
             interactionVocalBankCache[skinCacheIndex] = skinInteractionVocalBank;
         }
         else
@@ -564,17 +564,17 @@ public class VocalSfxSwapMod
         InteractionCharacterDatabase.Instance.courier.VocalBank = skinInteractionVocalBank;
     }
 
-    public static async Task<InteractionVocalBank> GenerateSkinInteractionVocalBank(VocalSfxSwapConfig config)
+    public static async Task<InteractionVocalBank> GenerateInteractionVocalBank(VocalSfxSwapConfig config)
     {
         if (BaseZoeInteractionVocalBank == null)
         {
             throw new Exception("Missing Zoe's base interaction vocal bank");
         }
 
-        return await GenerateSkinInteractionVocalBank(BaseZoeInteractionVocalBank, config);
+        return await GenerateInteractionVocalBank(BaseZoeInteractionVocalBank, config);
     }
 
-    public static async Task<InteractionVocalBank> GenerateSkinInteractionVocalBank(InteractionVocalBank baseInteractionVocalBank, VocalSfxSwapConfig config)
+    public static async Task<InteractionVocalBank> GenerateInteractionVocalBank(InteractionVocalBank baseInteractionVocalBank, VocalSfxSwapConfig config)
     {
         var interactionVocalBank = ScriptableObject.CreateInstance<InteractionVocalBank>();
         UnityEngine.Object.DontDestroyOnLoad(interactionVocalBank);
