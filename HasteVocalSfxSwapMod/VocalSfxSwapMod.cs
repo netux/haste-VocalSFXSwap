@@ -220,7 +220,10 @@ public class VocalSfxSwapMod
                                     paths = [.. paths, swapConfig.BasePath];
                                 }
 
-                                return Path.Combine([configDirectoryBasePath, .. paths, soundFilePath]);
+                                paths = [configDirectoryBasePath, .. paths, soundFilePath];
+                                paths = paths.Select(Util.NormalizePathForCurrentPlatform).ToArray();
+
+                                return Path.Combine(paths);
                             })
                             .ToArray();
                     }
