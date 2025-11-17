@@ -203,7 +203,7 @@ public class VocalSfxSwapMod
 
                         swapConfig.Clips = swapConfig.Clips
                             // Post-process: Resolve all paths
-                            .TakeWhile((soundFilePath) =>
+                            .Where((soundFilePath) =>
                             {
                                 if (Path.IsPathRooted(soundFilePath) || Path.IsPathFullyQualified(soundFilePath))
                                 {
@@ -230,7 +230,7 @@ public class VocalSfxSwapMod
 
                                 return Path.GetFullPath(Util.PathJoinMultiple(pathParts));
                             })
-                            .TakeWhile((soundFilePath) =>
+                            .Where((soundFilePath) =>
                             {
                                 if (!soundFilePath.StartsWith(configDirectoryPath))
                                 {
@@ -241,7 +241,7 @@ public class VocalSfxSwapMod
                                 return true;
                             })
                             // Post-process: Exclude unsupported audio files
-                            .TakeWhile(soundFilePath =>
+                            .Where(soundFilePath =>
                             {
                                 var fileExtension = Path.GetExtension(soundFilePath);
 
