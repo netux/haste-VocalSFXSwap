@@ -202,28 +202,43 @@ public class VocalSfxSwapMod
                         }
 
                         swapConfig.Clips = swapConfig.Clips
-                            .Select(soundFilePath =>
+                            // Post-process: Resolve all paths
+                            .TakeWhile((soundFilePath) =>
                             {
-                                // Post-process: Resolve all paths
-                                if (Path.IsPathFullyQualified(soundFilePath))
+                                if (Path.IsPathRooted(soundFilePath) || Path.IsPathFullyQualified(soundFilePath))
                                 {
-                                    return soundFilePath;
+                                    Debug.LogWarning($"[{nameof(VocalSfxSwapMod)}] Excluding sound file {soundFilePath} because it is an absolute path. All paths should be relative to the mod folder!");
+                                    return false;
                                 }
 
-                                string[] paths = [];
+                                return true;
+                            })
+                            .Select(soundFilePathPart =>
+                            {
+                                string[] pathParts = [];
                                 if (config.BasePath != null && config.BasePath != "")
                                 {
-                                    paths = [.. paths, config.BasePath];
+                                    pathParts = [.. pathParts, config.BasePath];
                                 }
                                 if (swapConfig.BasePath != null && swapConfig.BasePath != "")
                                 {
-                                    paths = [.. paths, swapConfig.BasePath];
+                                    pathParts = [.. pathParts, swapConfig.BasePath];
                                 }
 
-                                paths = [configDirectoryBasePath, .. paths, soundFilePath];
-                                paths = paths.Select(Util.NormalizePathForCurrentPlatform).ToArray();
+                                pathParts = [configDirectoryBasePath, .. pathParts, soundFilePathPart];
+                                pathParts = pathParts.Select(Util.NormalizePathForCurrentPlatform).ToArray();
 
-                                return Path.Combine(pathParts);
+                                return Path.GetFullPath(Util.PathJoinMultiple(pathParts));
+                            })
+                            .TakeWhile((soundFilePath) =>
+                            {
+                                if (!soundFilePath.StartsWith(configDirectoryBasePath))
+                                {
+                                    Debug.LogWarning($"[{nameof(VocalSfxSwapMod)}] Excluding sound file {soundFilePath} because it points to a file outside {configDirectoryBasePath}. All paths should be relative to the mod folder!");
+                                    return false;
+                                }
+
+                                return true;
                             })
                             // Post-process: Exclude unsupported audio files
                             .TakeWhile(soundFilePath =>
@@ -232,11 +247,11 @@ public class VocalSfxSwapMod
 
                                 if (!SupportedAudioFormats.ContainsKey(fileExtension))
                                 {
-                                    Debug.Log($"[{nameof(VocalSfxSwapMod)}] Excluding sound file {soundFilePath} due to it being an unsupported file type");
+                                    Debug.LogWarning($"[{nameof(VocalSfxSwapMod)}] Excluding sound file {soundFilePath} due to it being an unsupported file type");
                                     return false;
                                 }
 
-                                return Path.Combine(paths);
+                                return true;
                             })
                             .ToArray();
                     }

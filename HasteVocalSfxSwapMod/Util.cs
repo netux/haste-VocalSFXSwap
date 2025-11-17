@@ -48,4 +48,32 @@ internal static class Util
             return path;
         }
     }
+
+    public static string PathJoinMultiple(string[] parts)
+    {
+        const int MAX_PATH_JOIN_ARGS = 2;
+
+        string output = "";
+
+        for (int i = 0; i < parts.Length; i += MAX_PATH_JOIN_ARGS)
+        {
+            string[] args = parts[i..Math.Min(i + MAX_PATH_JOIN_ARGS, parts.Length)];
+            switch (args.Length)
+            {
+                case 0:
+                    break;
+                case 1:
+                    // NOTE: when output is empty, Path.Join(output, other) simply returns `other`
+                    output = Path.Join(output, args[0]);
+                    break;
+                case 2:
+                    output = Path.Join(output, args[0], args[1]);
+                    break;
+                default:
+                    throw new Exception("The laws of logic are broken");
+            }
+        }
+
+        return output;
+    }
 }
