@@ -201,10 +201,10 @@ public class VocalSfxSwapMod
                             continue;
                         }
 
-                        // Post-process: Resolve all paths
                         swapConfig.Clips = swapConfig.Clips
                             .Select(soundFilePath =>
                             {
+                                // Post-process: Resolve all paths
                                 if (Path.IsPathFullyQualified(soundFilePath))
                                 {
                                     return soundFilePath;
@@ -222,6 +222,19 @@ public class VocalSfxSwapMod
 
                                 paths = [configDirectoryBasePath, .. paths, soundFilePath];
                                 paths = paths.Select(Util.NormalizePathForCurrentPlatform).ToArray();
+
+                                return Path.Combine(pathParts);
+                            })
+                            // Post-process: Exclude unsupported audio files
+                            .TakeWhile(soundFilePath =>
+                            {
+                                var fileExtension = Path.GetExtension(soundFilePath);
+
+                                if (!SupportedAudioFormats.ContainsKey(fileExtension))
+                                {
+                                    Debug.Log($"[{nameof(VocalSfxSwapMod)}] Excluding sound file {soundFilePath} due to it being an unsupported file type");
+                                    return false;
+                                }
 
                                 return Path.Combine(paths);
                             })
