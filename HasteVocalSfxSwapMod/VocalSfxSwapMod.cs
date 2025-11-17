@@ -190,7 +190,7 @@ public class VocalSfxSwapMod
 
                 config.SkinIndex = skinIndex;
 
-                var configDirectoryBasePath = Path.GetDirectoryName(configFilePath);
+                var configDirectoryPath = Path.GetDirectoryName(configFilePath);
 
                 if (config.Swaps != null)
                 {
@@ -225,16 +225,16 @@ public class VocalSfxSwapMod
                                     pathParts = [.. pathParts, swapConfig.BasePath];
                                 }
 
-                                pathParts = [configDirectoryBasePath, .. pathParts, soundFilePathPart];
+                                pathParts = [configDirectoryPath, .. pathParts, soundFilePathPart];
                                 pathParts = pathParts.Select(Util.NormalizePathForCurrentPlatform).ToArray();
 
                                 return Path.GetFullPath(Util.PathJoinMultiple(pathParts));
                             })
                             .TakeWhile((soundFilePath) =>
                             {
-                                if (!soundFilePath.StartsWith(configDirectoryBasePath))
+                                if (!soundFilePath.StartsWith(configDirectoryPath))
                                 {
-                                    Debug.LogWarning($"[{nameof(VocalSfxSwapMod)}] Excluding sound file {soundFilePath} because it points to a file outside {configDirectoryBasePath}. All paths should be relative to the mod folder!");
+                                    Debug.LogWarning($"[{nameof(VocalSfxSwapMod)}] Excluding sound file {soundFilePath} because it points to a file outside {configDirectoryPath}. All paths should be relative to the mod folder!");
                                     return false;
                                 }
 
