@@ -843,4 +843,11 @@ Util.InteractionVocalBankFieldToSfxName(field),
         Debug.Log($"[{nameof(VocalSfxSwapMod)}] [DEBUG] Playing interaction vocal SFX \"{sfx.name}\"");
         original(interactionVocalPlayer, sfx);
     }
+
+    [Zorro.Core.CLI.ConsoleCommand]
+    public static void PrintCurrentSkinIndex()
+    {
+        var skinIndex = (int) FactSystem.GetFact(SkinManager.EquippedSkinBodyFact);
+        Debug.Log($"[{nameof(VocalSfxSwapMod)}] [DEBUG] Current Skin Index: {skinIndex}");
+    }
 }
