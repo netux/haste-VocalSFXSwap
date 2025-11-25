@@ -21,6 +21,8 @@ public class VocalSfxSwapMod
         }
     );
 
+    public static readonly Fact skinIndexFact = SkinManager.EquippedSkinHeadFact;
+
     private static VocalSfxSwapConfig? defaultConfig = null;
     public static VocalSfxSwapConfig? DefaultConfig
     {
@@ -56,7 +58,7 @@ public class VocalSfxSwapMod
     static VocalSfxSwapMod()
     {
         FactSystem.SubscribeToFact(
-            SkinManager.EquippedSkinBodyFact,
+            skinIndexFact,
             async (skinIndex) => await ReplaceAllVocals((int) skinIndex)
         );
 
@@ -69,7 +71,7 @@ public class VocalSfxSwapMod
 
             if (BaseZoeVocalBank == null)
             {
-                var skinIndex = (int)FactSystem.GetFact(SkinManager.EquippedSkinBodyFact);
+                var skinIndex = (int)FactSystem.GetFact(skinIndexFact);
                 await ReplaceAllVocals(skinIndex);
             }
         };
@@ -847,7 +849,7 @@ Util.InteractionVocalBankFieldToSfxName(field),
     [Zorro.Core.CLI.ConsoleCommand]
     public static void PrintCurrentSkinIndex()
     {
-        var skinIndex = (int) FactSystem.GetFact(SkinManager.EquippedSkinBodyFact);
+        var skinIndex = (int) FactSystem.GetFact(skinIndexFact);
         Debug.Log($"[{nameof(VocalSfxSwapMod)}] [DEBUG] Current Skin Index: {skinIndex}");
     }
 }
