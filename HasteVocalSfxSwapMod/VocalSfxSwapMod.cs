@@ -274,7 +274,7 @@ public class VocalSfxSwapMod
             }
             catch (JsonException error)
             {
-                Debug.LogError($"[{nameof(VocalSfxSwapMod)}] Could not parse Vocal SFX configuration: {error}");
+                Debug.LogError($"[{nameof(VocalSfxSwapMod)}] Could not parse Vocal SFX configuration {configFilePath}: {error}");
             }
         }
 
@@ -527,7 +527,7 @@ public class VocalSfxSwapMod
         }
         catch (Exception error)
         {
-            Debug.LogError($"[{nameof(VocalSfxSwapMod)}] Could not replace vocals: {error}");
+            Debug.LogError($"[{nameof(VocalSfxSwapMod)}] Could not replace interaction vocals: {error}");
         }
         finally
         {
@@ -754,6 +754,16 @@ public class VocalSfxSwapMod
                 .Select((name) => $"- {name}")
             )
         );
+    }
+
+    [Zorro.Core.CLI.ConsoleCommand]
+    public static void ReloadVocalSfx()
+    {
+        foreach (var item in Modloader.SubscribedItems)
+        {
+            Modloader.GetDirectoryFromFileId(item, out string directory, out bool _isOverride);
+            RegisterConfigsInDirectory(directory);
+        }
     }
 
     [Zorro.Core.CLI.ConsoleCommand]
