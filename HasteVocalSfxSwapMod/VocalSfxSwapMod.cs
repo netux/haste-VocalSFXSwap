@@ -261,7 +261,7 @@ public class VocalSfxSwapMod
 
                 if (skinIndex.HasValue)
                 {
-                    skinConfigs.Add(skinIndex.Value, config);
+                    skinConfigs[skinIndex.Value] = config;
                     Debug.Log($"[{nameof(VocalSfxSwapMod)}] Loaded vocal sfx config file for skin {skinIndex}: {configFilePath}");
                 }
                 else
