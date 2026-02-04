@@ -622,7 +622,7 @@ public class VocalSfxSwapMod
             throw new Exception("Unsupported file extension");
         }
 
-        using UnityWebRequest uwr = UnityWebRequestMultimedia.GetAudioClip(path, format.UnityFormat);
+        using UnityWebRequest uwr = UnityWebRequestMultimedia.GetAudioClip($"file://{path}", format.UnityFormat);
         await uwr.SendWebRequest();
 
         if (uwr.result == UnityWebRequest.Result.ConnectionError || uwr.result == UnityWebRequest.Result.DataProcessingError)
