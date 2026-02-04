@@ -477,6 +477,7 @@ public class VocalSfxSwapMod
     {
         var vocalBank = ScriptableObject.CreateInstance<VocalBank>();
         UnityEngine.Object.DontDestroyOnLoad(vocalBank);
+        vocalBank.hideFlags = HideFlags.DontSave;
         vocalBank.name = $"{baseVocalBank.name} {config}";
 
         // Copy all SFX_Instances from Zoe's base vocal bank to the new voice bank
@@ -581,6 +582,7 @@ public class VocalSfxSwapMod
     {
         var interactionVocalBank = ScriptableObject.CreateInstance<InteractionVocalBank>();
         UnityEngine.Object.DontDestroyOnLoad(interactionVocalBank);
+        interactionVocalBank.hideFlags = HideFlags.DontSave;
         interactionVocalBank.name = $"{baseInteractionVocalBank.name} {config}";
 
         // Copy all SFX_Instances from Zoe's base interaction vocal bank to the new interaction voice bank
